@@ -19,7 +19,7 @@ setuptools.setup(
     description="make it easy to use pymysql",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://gitee.com/ZeroSeeker/envx",
+    url="https://gitee.com/ZeroSeeker/fastmysql",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
