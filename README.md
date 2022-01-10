@@ -9,13 +9,19 @@
 
 #### 安装教程
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+1.  pip安装
+```shell script
+pip install fastmysql
+```
+2.  pip安装（使用淘宝镜像加速）
+```shell script
+pip install fastmysql -i https://mirrors.aliyun.com/pypi/simple
+```
 
 #### 使用说明
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
-
+1.  demo
+```python
+import fastmysql
+query_res = fastmysql.query_table_all_data(db_name='test', tb_name='test')
+```
