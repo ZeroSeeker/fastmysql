@@ -169,15 +169,19 @@ def con2db(
 
 
 def _query(
-        cur,
         sql: str,
-        parameter: tuple = None
+        cur,
+        con=None,
+        parameter: tuple = None,
+        operate: bool = False  # 是否为操作
 ):
     """
     查询结果以list(dict)形式输出
-    :param cur:
     :param sql:
+    :param cur:
+    :param con:
     :param parameter: 参数化查询语句避免SQL注入
+    :param operate: 为True的时候执行操作（执行commit），为False的时候执行查询数据（不执行commit）
     :return:
     """
     try:
@@ -185,15 +189,21 @@ def _query(
             cur.execute(sql)
         else:
             cur.execute(sql, parameter)
-
-        index = cur.description
-        result = list()
-        for res in cur.fetchall():
-            row = OrderedDict()
-            for i in range(len(index)):
-                row[index[i][0]] = res[i]
-            result.append(row)
-        return result
+        if operate is False:
+            # 只查询
+            index = cur.description
+            result = list()
+            for res in cur.fetchall():
+                row = OrderedDict()
+                for i in range(len(index)):
+                    row[index[i][0]] = res[i]
+                result.append(row)
+            return result
+        else:
+            # 只操作
+            effect_rows = cur.rowcount
+            con.commit()
+            return effect_rows
     except Exception as ex:
         showlog.warning("Oops! there is an error occurred in query:%s , sql: %s" % (ex, sql))
         return
@@ -314,6 +324,7 @@ def query_by_sql(
 
 def do_by_sql(
         sql: str,
+        parameter: tuple = None,  # 参数化查询避免sql注入
         db_name: str = None,
         con_info: dict = None,  # 若指定，将优先使用
         env_file_name: str = 'mysql.env',
@@ -337,9 +348,13 @@ def do_by_sql(
         )
         if silence is True:
             try:
-                cur.execute(sql)
-                effect_rows = cur.rowcount
-                con.commit()
+                effect_rows = _query(
+                    sql=sql,
+                    parameter=parameter,
+                    cur=cur,
+                    con=con,
+                    operate=True
+                )
                 return effect_rows
             except Exception as ex:
                 showlog.warning("Oops! an error occurred, maybe query error. Exception: %s" % ex)
@@ -347,9 +362,13 @@ def do_by_sql(
         else:
             showlog.info("Executing sql：%s ..." % sql)
             try:
-                cur.execute(sql)
-                effect_rows = cur.rowcount
-                con.commit()
+                effect_rows = _query(
+                    sql=sql,
+                    parameter=parameter,
+                    cur=cur,
+                    con=con,
+                    operate=True
+                )
                 showlog.info("Executing sql success.")
                 return effect_rows
             except Exception as ex:
