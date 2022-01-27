@@ -270,7 +270,7 @@ def query_table_all_data(
 
 
 def query_by_sql(
-        sql: str,  # 参数用?表示
+        sql: str,  # 参数用%s表示
         parameter: tuple = None,  # 参数化查询避免sql注入
         db_name: str = None,
         con_info: dict = None,  # 若指定，将优先使用
@@ -323,7 +323,7 @@ def query_by_sql(
 
 
 def do_by_sql(
-        sql: str,
+        sql: str,  # 参数用%s表示
         parameter: tuple = None,  # 参数化查询避免sql注入
         db_name: str = None,
         con_info: dict = None,  # 若指定，将优先使用
