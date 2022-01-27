@@ -171,7 +171,7 @@ def con2db(
 def _query(
         cur,
         sql: str,
-        parameter=None
+        parameter: tuple = None
 ):
     """
     查询结果以list(dict)形式输出
@@ -225,12 +225,18 @@ def query_table_all_data(
             silence=silence
         )
         if order_col is None:
-            sql = "SELECT * FROM `%s`.`%s`" % (db_name, tb_name)
+            sql = "SELECT * FROM `?`.`?`"
+            parameter = (db_name, tb_name)
         else:
-            sql = "SELECT * FROM `%s`.`%s` ORDER BY `%s` %s" % (db_name, tb_name, order_col, order_index)
+            sql = "SELECT * FROM `?`.`?` ORDER BY `?` ?"
+            parameter = (db_name, tb_name, order_col, order_index)
         if silence is True:
             try:
-                res = _query(cur, sql)
+                res = _query(
+                    cur=cur,
+                    sql=sql,
+                    parameter=parameter
+                )
                 return res
             except Exception as ex:
                 showlog.warning("Oops! an error occurred, maybe query error. Exception: %s" % ex)
@@ -238,7 +244,11 @@ def query_table_all_data(
         else:
             showlog.info("Executing sql：%s ..." % sql)
             try:
-                res = _query(cur, sql)
+                res = _query(
+                    cur=cur,
+                    sql=sql,
+                    parameter=parameter
+                )
                 showlog.info("Executing sql success.")
                 return res
             except Exception as ex:
@@ -250,7 +260,8 @@ def query_table_all_data(
 
 
 def query_by_sql(
-        sql: str,
+        sql: str,  # 参数用?表示
+        parameter: tuple = None,  # 参数化查询避免sql注入
         db_name: str = None,
         con_info: dict = None,  # 若指定，将优先使用
         env_file_name: str = 'mysql.env',
@@ -274,7 +285,11 @@ def query_by_sql(
         )
         if silence is True:
             try:
-                res = _query(cur, sql)
+                res = _query(
+                    cur=cur,
+                    sql=sql,
+                    parameter=parameter
+                )
                 return res
             except Exception as ex:
                 showlog.warning("Oops! an error occurred, maybe query error. Exception: %s" % ex)
@@ -282,7 +297,11 @@ def query_by_sql(
         else:
             showlog.info("Executing sql：%s ..." % sql)
             try:
-                res = _query(cur, sql)
+                res = _query(
+                    cur=cur,
+                    sql=sql,
+                    parameter=parameter
+                )
                 showlog.info("Executing sql success.")
                 return res
             except Exception as ex:
@@ -363,7 +382,10 @@ def data_bases(
         sql = "SHOW DATABASES;"
         if silence is True:
             try:
-                res = _query(cur, sql)
+                res = _query(
+                    cur=cur,
+                    sql=sql
+                )
                 inner_db_list = list()
                 for each in res:
                     for k, v in each.items():
@@ -375,7 +397,10 @@ def data_bases(
         else:
             showlog.info("Executing sql：%s ..." % sql)
             try:
-                res = _query(cur, sql)
+                res = _query(
+                    cur=cur,
+                    sql=sql
+                )
                 showlog.info("Executing sql success.")
                 inner_db_list = list()
                 for each in res:
@@ -414,7 +439,10 @@ def tables(
         sql = "SHOW TABLES;"
         if silence is True:
             try:
-                res = _query(cur, sql)
+                res = _query(
+                    cur=cur,
+                    sql=sql
+                )
                 table_list = list()
                 for each in res:
                     for k, v in each.items():
@@ -425,7 +453,10 @@ def tables(
         else:
             showlog.info("Executing sql：%s ..." % sql)
             try:
-                res = _query(cur, sql)
+                res = _query(
+                    cur=cur,
+                    sql=sql
+                )
                 showlog.info("Executing sql success.")
                 table_list = list()
                 for each in res:
@@ -493,10 +524,14 @@ def column_list(
         FROM
             `information_schema`.`COLUMNS` 
         WHERE
-            `TABLE_SCHEMA` = '%s' 
-            AND `TABLE_NAME` = '%s';
-        """ % (db_name, tb_name)
-        all_col_dict = _query(cur, sql1)
+            `TABLE_SCHEMA` = '?' 
+            AND `TABLE_NAME` = '?';
+        """
+        all_col_dict = _query(
+            cur=cur,
+            sql=sql1,
+            parameter=(db_name, tb_name)
+        )
         all_col_list = list()
         for each in all_col_dict:
             all_col_list.append(each.get("COLUMN_NAME"))
@@ -506,10 +541,14 @@ def column_list(
         FROM
             `information_schema`.`KEY_COLUMN_USAGE` 
         WHERE
-            `TABLE_SCHEMA` = '%s' 
-            AND `TABLE_NAME` = '%s'
-        """ % (db_name, tb_name)
-        pk_col_dict = _query(cur, sql2)
+            `TABLE_SCHEMA` = '?' 
+            AND `TABLE_NAME` = '?'
+        """
+        pk_col_dict = _query(
+            cur=cur,
+            sql=sql2,
+            parameter=(db_name, tb_name)
+        )
         pk_col_list = list()
         for each in pk_col_dict:
             pk_col_list.append(each.get("COLUMN_NAME"))
