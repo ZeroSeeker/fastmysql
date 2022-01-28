@@ -235,10 +235,10 @@ def query_table_all_data(
             silence=silence
         )
         if order_col is None:
-            sql = "SELECT * FROM `?`.`?`"
+            sql = "SELECT * FROM ?.?"
             parameter = (db_name, tb_name)
         else:
-            sql = "SELECT * FROM `?`.`?` ORDER BY `?` ?"
+            sql = "SELECT * FROM ?.? ORDER BY ? ?"
             parameter = (db_name, tb_name, order_col, order_index)
         if silence is True:
             try:
@@ -543,8 +543,8 @@ def column_list(
         FROM
             `information_schema`.`COLUMNS` 
         WHERE
-            `TABLE_SCHEMA` = '?' 
-            AND `TABLE_NAME` = '?';
+            `TABLE_SCHEMA` = ? 
+            AND `TABLE_NAME` = ?;
         """
         all_col_dict = _query(
             cur=cur,
@@ -560,8 +560,8 @@ def column_list(
         FROM
             `information_schema`.`KEY_COLUMN_USAGE` 
         WHERE
-            `TABLE_SCHEMA` = '?' 
-            AND `TABLE_NAME` = '?'
+            `TABLE_SCHEMA` = ? 
+            AND `TABLE_NAME` = ?
         """
         pk_col_dict = _query(
             cur=cur,
