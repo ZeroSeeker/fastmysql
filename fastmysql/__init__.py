@@ -543,8 +543,8 @@ def column_list(
         FROM
             `information_schema`.`COLUMNS` 
         WHERE
-            `TABLE_SCHEMA` = ? 
-            AND `TABLE_NAME` = ?;
+            `TABLE_SCHEMA` = %s 
+            AND `TABLE_NAME` = %s;
         """
         all_col_dict = _query(
             cur=cur,
@@ -560,8 +560,8 @@ def column_list(
         FROM
             `information_schema`.`KEY_COLUMN_USAGE` 
         WHERE
-            `TABLE_SCHEMA` = ? 
-            AND `TABLE_NAME` = ?
+            `TABLE_SCHEMA` = %s 
+            AND `TABLE_NAME` = %s
         """
         pk_col_dict = _query(
             cur=cur,
