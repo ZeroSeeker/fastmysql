@@ -205,17 +205,17 @@ def _query(
             con.commit()
             return effect_rows
     except Exception as ex:
-        showlog.warning("Oops! there is an error occurred in query:%s , sql: %s" % (ex, sql))
+        showlog.warning("Oops! there is an error occurred in query:%s , sql: %s ,parameter: %s" % (ex, sql, parameter))
         return
 
 
 def query_table_all_data(
-        db_name: str,
-        tb_name: str,
+        db_name: str,  # 必须为内部参数，防止注入
+        tb_name: str,  # 必须为内部参数，防止注入
         con_info: dict = None,  # 若指定，将优先使用
         env_file_name: str = 'mysql.env',
-        order_col: str = None,  # 需要排序的列
-        order_index: str = "DESC",  # 排序规则
+        order_col: str = None,  # 需要排序的列，必须为内部参数，防止注入
+        order_index: str = "DESC",  # 排序规则，必须为内部参数，防止注入
         silence: bool = silence_default
 ):
     """
@@ -235,11 +235,11 @@ def query_table_all_data(
             silence=silence
         )
         if order_col is None:
-            sql = "SELECT * FROM ?.?"
-            parameter = (db_name, tb_name)
+            sql = "SELECT * FROM `%s`.`%s`" % (db_name, tb_name)
+            parameter = None
         else:
-            sql = "SELECT * FROM ?.? ORDER BY ? ?"
-            parameter = (db_name, tb_name, order_col, order_index)
+            sql = "SELECT * FROM `%s`.`%s` ORDER BY %s %s" % (db_name, tb_name, order_col, order_index)
+            parameter = None
         if silence is True:
             try:
                 res = _query(
@@ -249,7 +249,6 @@ def query_table_all_data(
                 )
                 return res
             except Exception as ex:
-                showlog.warning("Oops! an error occurred, maybe query error. Exception: %s" % ex)
                 return
         else:
             showlog.info("Executing sql：%s ..." % sql)
