@@ -27,7 +27,6 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     install_requires=[
-        'colorama==0.4.4',
         'envx==0.0.5',
         'numpy==1.22.0',
         'pandas==1.3.5',

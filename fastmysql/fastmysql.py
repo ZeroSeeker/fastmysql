@@ -37,7 +37,11 @@ def make_con_info(
 
         port = inner_env.get('port')
         if port is not None and len(port) > 0:
-            con_info['port'] = port
+            try:
+                con_info['port'] = int(port)
+            except:
+                showlog.warning('port 填写错误，必须为int')
+                exit()
         else:
             showlog.warning('port 未填写，将设置为默认值：3306')
             con_info['port'] = 3306
@@ -1046,3 +1050,34 @@ def update(
             showlog.error("Oops! an error occurred!")
         else:
             return
+
+
+def show_create_table(
+        db_name: str,
+        tb_name: str,
+        con_info: dict = None,  # 若指定，将优先使用
+        env_file_name: str = 'mysql.env',
+        silence: bool = silence_default
+):
+    """
+    获取建表语句
+    """
+    # ---------------- 固定设置 ----------------
+    if con_info is None:
+        con_info = make_con_info(env_file_name=env_file_name)
+    else:
+        pass
+    # ---------------- 固定设置 ----------------
+    sql = 'SHOW CREATE TABLE `%s`.`%s`;' % (db_name, tb_name)
+    res = query_by_sql(
+        db_name=db_name,
+        sql=sql,
+        env_file_name=env_file_name,
+        con_info=con_info,
+        silence=silence
+    )
+    if res is None:
+        return None
+    else:
+        create_table = res[0]['Create Table']
+        return create_table
