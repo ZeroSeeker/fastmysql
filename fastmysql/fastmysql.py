@@ -21,17 +21,49 @@ silence_default = True
 def make_con_info(
         env_file_name: str = 'mysql.env'
 ):
-    # ---------------- 固定设置 ----------------
     inner_env = envx.read(file_name=env_file_name)
-    con_info = {
-        "host": inner_env['host'],
-        "port": int(inner_env.get('port', '3306')),
-        "username": inner_env.get('username', 'root'),
-        "password": inner_env['password'],
-        "charset": inner_env.get('charset', 'utf8'),
-    }
-    # ---------------- 固定设置 ----------------
-    return con_info
+    if inner_env is None or len(inner_env) == 0:
+        showlog.warning('[%s]文件不存在或文件填写错误！' % env_file_name)
+        exit()
+    else:
+        con_info = dict()
+
+        host = inner_env.get('host')
+        if host is not None and len(host) > 0:
+            con_info['host'] = host
+        else:
+            showlog.warning('host 未填写，将设置为默认值：localhost')
+            con_info['host'] = 'localhost'
+
+        port = inner_env.get('port')
+        if port is not None and len(port) > 0:
+            con_info['port'] = port
+        else:
+            showlog.warning('port 未填写，将设置为默认值：3306')
+            con_info['port'] = 3306
+
+        username = inner_env.get('username')
+        if username is not None and len(username) > 0:
+            con_info['username'] = username
+        else:
+            showlog.warning('username 未填写，将设置为默认值：root')
+            con_info['username'] = 'root'
+
+        password = inner_env.get('password')
+        if password is not None and len(password) > 0:
+            con_info['password'] = password
+        else:
+            showlog.warning('password 未填写，将设置为默认值：空')
+            con_info['password'] = ''
+
+        charset = inner_env.get('charset')
+        if charset is not None and len(charset) > 0:
+            con_info['charset'] = charset
+        else:
+            showlog.warning('charset 未填写，将设置为默认值：utf8')
+            con_info['charset'] = 'utf8'
+
+        return con_info
 
 
 def con_mysql(
