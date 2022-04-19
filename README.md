@@ -24,7 +24,16 @@ pip install fastmysql -i https://mirrors.aliyun.com/pypi/simple
 1.  demo
 ```python
 import fastmysql
-query_res = fastmysql.query_table_all_data(db_name='test', tb_name='test')
+query_res = fastmysql.query_table_all_data(
+    db_name='test', 
+    tb_name='test'
+)
+
+# 获取建表语句
+res = fastmysql.show_create_table(
+    db_name='test',
+    tb_name='test'
+)
 ```
 
 2.  防止sql注入：
