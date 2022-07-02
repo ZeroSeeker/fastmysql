@@ -217,7 +217,8 @@ def _query(
         cur,
         con=None,
         parameter: tuple = None,
-        operate: bool = False  # 是否为操作
+        operate: bool = False,  # 是否为操作
+        order_dict: bool = True
 ):
     """
     查询结果以list(dict)形式输出
@@ -226,6 +227,7 @@ def _query(
     :param con:
     :param parameter: 参数化查询语句避免SQL注入
     :param operate: 为True的时候执行操作（执行commit），为False的时候执行查询数据（不执行commit）
+    :param order_dict: 返回值是否组成有序dict
     :return:
     """
     try:
@@ -238,7 +240,10 @@ def _query(
             index = cur.description
             result = list()
             for res in cur.fetchall():
-                row = OrderedDict()
+                if order_dict is True:
+                    row = OrderedDict()
+                else:
+                    row = dict()
                 for i in range(len(index)):
                     row[index[i][0]] = res[i]
                 result.append(row)
@@ -260,7 +265,8 @@ def query_table_all_data(
         env_file_name: str = 'mysql.env',
         order_col: str = None,  # 需要排序的列，必须为内部参数，防止注入
         order_index: str = "DESC",  # 排序规则，必须为内部参数，防止注入
-        silence: bool = silence_default
+        silence: bool = silence_default,
+        order_dict: bool = True
 ):
     """
     查询某个表的所有数据
@@ -292,7 +298,8 @@ def query_table_all_data(
                 res = _query(
                     cur=cur,
                     sql=sql,
-                    parameter=parameter
+                    parameter=parameter,
+                    order_dict=order_dict
                 )
                 return res
             except Exception as ex:
@@ -303,7 +310,8 @@ def query_table_all_data(
                 res = _query(
                     cur=cur,
                     sql=sql,
-                    parameter=parameter
+                    parameter=parameter,
+                    order_dict=order_dict
                 )
                 showlog.info("Executing sql success.")
                 return res
@@ -321,7 +329,8 @@ def query_by_sql(
         db_name: str = None,
         con_info: dict = None,  # 若指定，将优先使用
         env_file_name: str = 'mysql.env',
-        silence: bool = silence_default
+        silence: bool = silence_default,
+        order_dict: bool = True
 ):
     """
     按照sql查询
@@ -347,7 +356,8 @@ def query_by_sql(
                 res = _query(
                     cur=cur,
                     sql=sql,
-                    parameter=parameter
+                    parameter=parameter,
+                    order_dict=order_dict
                 )
                 return res
             except Exception as ex:
@@ -359,7 +369,8 @@ def query_by_sql(
                 res = _query(
                     cur=cur,
                     sql=sql,
-                    parameter=parameter
+                    parameter=parameter,
+                    order_dict=order_dict
                 )
                 showlog.info("Executing sql success.")
                 return res
@@ -377,7 +388,8 @@ def do_by_sql(
         db_name: str = None,
         con_info: dict = None,  # 若指定，将优先使用
         env_file_name: str = 'mysql.env',
-        silence: bool = silence_default
+        silence: bool = silence_default,
+        order_dict: bool = True
 ):
     """
     按照sql执行
@@ -405,7 +417,8 @@ def do_by_sql(
                     parameter=parameter,
                     cur=cur,
                     con=con,
-                    operate=True
+                    operate=True,
+                    order_dict=order_dict
                 )
                 return effect_rows
             except Exception as ex:
@@ -419,7 +432,8 @@ def do_by_sql(
                     parameter=parameter,
                     cur=cur,
                     con=con,
-                    operate=True
+                    operate=True,
+                    order_dict=order_dict
                 )
                 showlog.info("Executing sql success.")
                 return effect_rows
@@ -434,7 +448,8 @@ def do_by_sql(
 def data_bases(
         con_info: dict = None,  # 若指定，将优先使用
         env_file_name: str = 'mysql.env',
-        silence: bool = silence_default
+        silence: bool = silence_default,
+        order_dict: bool = True
 ):
     """
     获取MySQL的连接权限范围内的所有db列表
@@ -458,7 +473,8 @@ def data_bases(
             try:
                 res = _query(
                     cur=cur,
-                    sql=sql
+                    sql=sql,
+                    order_dict=order_dict
                 )
                 inner_db_list = list()
                 for each in res:
@@ -473,7 +489,8 @@ def data_bases(
             try:
                 res = _query(
                     cur=cur,
-                    sql=sql
+                    sql=sql,
+                    order_dict=order_dict
                 )
                 showlog.info("Executing sql success.")
                 inner_db_list = list()
@@ -493,7 +510,8 @@ def tables(
         db_name: str = None,  # 指定数据库，若不指定，将获取所有
         con_info: dict = None,  # 若指定，将优先使用
         env_file_name: str = 'mysql.env',
-        silence: bool = silence_default
+        silence: bool = silence_default,
+        order_dict: bool = True
 ):
     """
         获取所有表，若不指定db_name，将获取所有
@@ -518,7 +536,8 @@ def tables(
             try:
                 res = _query(
                     cur=cur,
-                    sql=sql
+                    sql=sql,
+                    order_dict=order_dict
                 )
                 table_list = list()
                 for each in res:
@@ -532,7 +551,8 @@ def tables(
             try:
                 res = _query(
                     cur=cur,
-                    sql=sql
+                    sql=sql,
+                    order_dict=order_dict
                 )
                 showlog.info("Executing sql success.")
                 table_list = list()
@@ -584,7 +604,8 @@ def column_list(
         tb_name: str,
         con_info: dict = None,  # 若指定，将优先使用
         env_file_name: str = 'mysql.env',
-        silence: bool = silence_default
+        silence: bool = silence_default,
+        order_dict: bool = True
 ):
     # ---------------- 固定设置 ----------------
     if con_info is None:
@@ -613,7 +634,8 @@ def column_list(
         all_col_dict = _query(
             cur=cur,
             sql=sql1,
-            parameter=(db_name, tb_name)
+            parameter=(db_name, tb_name),
+            order_dict=order_dict
         )
         all_col_list = list()
         for each in all_col_dict:
@@ -630,7 +652,8 @@ def column_list(
         pk_col_dict = _query(
             cur=cur,
             sql=sql2,
-            parameter=(db_name, tb_name)
+            parameter=(db_name, tb_name),
+            order_dict=order_dict
         )
         pk_col_list = list()
         for each in pk_col_dict:
