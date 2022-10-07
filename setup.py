@@ -13,7 +13,7 @@ with open("README.md", "r", encoding='utf-8') as fh:
 
 setuptools.setup(
     name="fastmysql",
-    version="0.0.13",
+    version="0.0.14",
     author="ZeroSeeker",
     author_email="zeroseeker@foxmail.com",
     description="make it easy to use pymysql",
@@ -28,8 +28,8 @@ setuptools.setup(
     ],
     install_requires=[
         'envx==0.0.5',
-        'numpy==1.22.0',
-        'pandas==1.3.5',
+        'numpy>=1.19.5',
+        'pandas>=1.1.5',
         'PyMySQL==1.0.2',
         'python-dateutil==2.8.2',
         'pytz==2022.1',
