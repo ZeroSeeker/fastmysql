@@ -115,9 +115,9 @@ def con_mysql(
                 cur = con.cursor()
             else:
                 cur = pymysql.cursors.SSCursor(con)  # 使用流式游标
-            cur.execute('SET NAMES utf8mb4')
-            cur.execute('SET CHARACTER SET utf8mb4')
-            cur.execute('SET character_set_connection=utf8mb4')
+            cur.execute(query='SET NAMES utf8mb4')
+            cur.execute(query='SET CHARACTER SET utf8mb4')
+            cur.execute(query='SET character_set_connection=utf8mb4')
             showlog.info('ok! connection success.')
             return con, cur
         except:
@@ -161,9 +161,9 @@ def con_mysql_silence(
                 cur = con.cursor()
             else:
                 cur = pymysql.cursors.SSCursor(con)  # 使用流式游标
-            cur.execute('SET NAMES utf8mb4')
-            cur.execute('SET CHARACTER SET utf8mb4')
-            cur.execute('SET character_set_connection=utf8mb4')
+            cur.execute(query='SET NAMES utf8mb4')
+            cur.execute(query='SET CHARACTER SET utf8mb4')
+            cur.execute(query='SET character_set_connection=utf8mb4')
             return con, cur
         except:
             time.sleep(5)
@@ -232,9 +232,9 @@ def _query(
     """
     try:
         if parameter is None:
-            cur.execute(sql)
+            cur.execute(query=sql)
         else:
-            cur.execute(sql, parameter)
+            cur.execute(query=sql, args=parameter)
         if operate is False:
             # 只查询
             index = cur.description
@@ -695,9 +695,9 @@ def query_to_pd(
             silence=silence
         )
         if parameter is None:
-            cur.execute(sql)
+            cur.execute(query=sql)
         else:
-            cur.execute(sql, parameter)
+            cur.execute(query=sql, args=parameter)
         index = cur.description
         columns = list()
         for each in index:
@@ -865,7 +865,7 @@ def replace_into(
                             showlog.info('operating %s data...' % len(data_list_single))
                         else:
                             pass
-                        cur.executemany(operate_clause, list(data_list_single))
+                        cur.executemany(query=operate_clause, args=list(data_list_single))
                         con.commit()
                         if silence is False:
                             showlog.info("operate success.")
@@ -906,7 +906,8 @@ def insert(
         con_info: dict = None,  # 若指定，将优先使用
         env_file_name: str = 'mysql.env',
         replace_space_to_none: bool = True,  # 自动将空值null改为None
-        silence: bool = silence_default
+        silence: bool = silence_default,
+        auto_reconnect: bool = True
 ):
     """
     此模块的功能是插入和自动更新
@@ -973,25 +974,36 @@ def insert(
 
                 insert_data_list = set(insert_data_list)  # set去重
 
-                try:
-                    if silence is False:
-                        showlog.info('Inserting %s data...' % len(insert_data_list))
-                    else:
-                        pass
-                    cur.executemany(insert_clause, list(insert_data_list))
-                    con.commit()
-                    if silence is False:
-                        showlog.info("Insert success.")
-                    else:
-                        pass
-                    return True
-                except:
-                    if silence is False:
-                        showlog.error("Insert failure.insert_clause: %s" % insert_clause)
-                        print(insert_clause, list(insert_data_list)[0])
-                    else:
-                        pass
-                    return False
+                while True:
+                    try:
+                        if silence is False:
+                            showlog.info('Inserting %s data...' % len(insert_data_list))
+                        else:
+                            pass
+                        cur.executemany(query=insert_clause, args=list(insert_data_list))
+                        con.commit()
+                        if silence is False:
+                            showlog.info("Insert success.")
+                        else:
+                            pass
+                        return True
+                    except ConnectionAbortedError:
+                        if silence is False:
+                            showlog.error("Insert failure. insert_clause: %s" % insert_clause)
+                            showlog.warning('try to reconnect in 1 second...')
+                        else:
+                            pass
+                        if auto_reconnect:
+                            time.sleep(1)
+                        else:
+                            return False
+                    except:
+                        if silence is False:
+                            showlog.error("Insert failure. insert_clause: %s" % insert_clause)
+                            print(insert_clause, list(insert_data_list)[0])
+                        else:
+                            pass
+                        return False
             else:
                 if silence is False:
                     showlog.warning("Oops! can't get connection.")
@@ -1094,7 +1106,7 @@ def update(
                         update_clause = 'UPDATE `%s`.`%s` SET %s WHERE %s' % \
                                         (db_name, tb_name, set_string, where_string)
                         # print(update_clause)
-                        cur.execute(update_clause)
+                        cur.execute(query=update_clause)
                     con.commit()
                     return 1
                 except:

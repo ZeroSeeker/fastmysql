@@ -12,11 +12,11 @@
 
 1.  pip安装
 ```shell script
-pip install fastmysql
+pip3 install fastmysql
 ```
 2.  pip安装（使用淘宝镜像加速）
 ```shell script
-pip install fastmysql -i https://mirrors.aliyun.com/pypi/simple
+pip3 install fastmysql -i https://mirrors.aliyun.com/pypi/simple
 ```
 
 #### 使用说明
