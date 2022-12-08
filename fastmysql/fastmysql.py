@@ -989,7 +989,17 @@ def insert(
                         return True
                     except ConnectionAbortedError:
                         if silence is False:
-                            showlog.error("Insert failure. insert_clause: %s" % insert_clause)
+                            showlog.error("ConnectionAbortedError. insert_clause: %s" % insert_clause)
+                            showlog.warning('try to reconnect in 1 second...')
+                        else:
+                            pass
+                        if auto_reconnect:
+                            time.sleep(1)
+                        else:
+                            return False
+                    except TimeoutError:
+                        if silence is False:
+                            showlog.error("TimeoutError. insert_clause: %s" % insert_clause)
                             showlog.warning('try to reconnect in 1 second...')
                         else:
                             pass
