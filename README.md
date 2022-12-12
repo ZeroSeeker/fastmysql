@@ -50,3 +50,6 @@ cursor.execute('insert into user (name,password) value (?,?)'%(name,password))
 
 cursor.execute('select * from user where user=%s and password=%s'%(name,password))
 　　要是name和password都等于'a or 1=1'，那么这个语句会把整个user表都查询出来
+
+3.  默认环境
+- 默认使用的环境文件为：mysql.env

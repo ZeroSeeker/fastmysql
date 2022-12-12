@@ -15,63 +15,67 @@ import pymysql
 import time
 import copy
 import envx
-silence_default = True
+silence_default = True  # 默认静默参数为True
+env_file_name_default = 'mysql.env'  # 默认数据库连接环境文件名
 
 
 def make_con_info(
-        env_file_name: str = 'mysql.env',
-        silence: bool = silence_default,  # 默认为非静默模式
+        env_file_name: str = env_file_name_default,
+        silence: bool = silence_default
 ):
+    """
+    读取当前环境的环境文件信息并生成连接信息
+    """
     inner_env = envx.read(file_name=env_file_name)
-    if inner_env is None or len(inner_env) == 0:
-        if silence is False:
-            showlog.warning('[%s]文件不存在或文件填写错误！' % env_file_name)
+    if not inner_env:
+        if not silence:
+            showlog.warning(f'环境文件[ {env_file_name} ]不存在！')
         exit()
     else:
         con_info = dict()
 
         host = inner_env.get('host')
-        if host is not None and len(host) > 0:
+        if host:
             con_info['host'] = host
         else:
-            if silence is False:
+            if not silence:
                 showlog.warning('host 未填写，将设置为默认值：localhost')
             con_info['host'] = 'localhost'
 
         port = inner_env.get('port')
-        if port is not None and len(port) > 0:
+        if port:
             try:
                 con_info['port'] = int(port)
             except:
-                if silence is False:
+                if not silence:
                     showlog.warning('port 填写错误，必须为int')
                 exit()
         else:
-            if silence is False:
+            if not silence:
                 showlog.warning('port 未填写，将设置为默认值：3306')
             con_info['port'] = 3306
 
         username = inner_env.get('username')
-        if username is not None and len(username) > 0:
+        if username:
             con_info['username'] = username
         else:
-            if silence is False:
+            if not silence:
                 showlog.warning('username 未填写，将设置为默认值：root')
             con_info['username'] = 'root'
 
         password = inner_env.get('password')
-        if password is not None and len(password) > 0:
+        if password:
             con_info['password'] = password
         else:
-            if silence is False:
+            if not silence:
                 showlog.warning('password 未填写，将设置为默认值：空')
             con_info['password'] = ''
 
         charset = inner_env.get('charset')
-        if charset is not None and len(charset) > 0:
+        if charset:
             con_info['charset'] = charset
         else:
-            if silence is False:
+            if not silence:
                 showlog.warning('charset 未填写，将设置为默认值：utf8')
             con_info['charset'] = 'utf8'
 
@@ -85,12 +89,15 @@ def con_mysql(
         db_name: str = None,
         port: int = 3306,
         charset: str = 'utf8',
-        ssc: bool = False
+        ssc: bool = False,
+        silence: bool = silence_default,
+        auto_reconnect: bool = True,
+        reconnect_wait: int = 5
 ):
     """
-    此函数为有提示信息的Mysql数据库连接函数的优化，内部预定义了连接的默认字符设置
+    执行连接数据库
     当连接失败时，将倒计时5秒后重连，直到连接成功
-    此函数有运行提示
+    包含重试机制
     :param host:
     :param db_name:
     :param username:
@@ -98,11 +105,15 @@ def con_mysql(
     :param port: 默认端口为3306
     :param charset: 默认字符集为utf8
     :param ssc: 默认不使用流式游标
+    :param silence: 静默模式
+    :param auto_reconnect: 自动重连
+    :param reconnect_wait: 重连等待时间，单位为秒，默认为5秒
     :return:(con, cur)
     """
     while True:
         try:
-            showlog.info('User [%s] are trying to connect to the database [%s] ...' % (username, db_name))
+            if not silence:
+                showlog.info(f'User [{username}] are trying to connect to the database [{db_name}] ...')
             con = pymysql.connect(
                 host=host,
                 db=db_name,
@@ -118,98 +129,63 @@ def con_mysql(
             cur.execute(query='SET NAMES utf8mb4')
             cur.execute(query='SET CHARACTER SET utf8mb4')
             cur.execute(query='SET character_set_connection=utf8mb4')
-            showlog.info('ok! connection success.')
+            if not silence:
+                showlog.info('ok! connection success.')
             return con, cur
-        except:
-            showlog.error('Oops, connection failed, Trying to reconnect in 5 seconds ...')
-            time.sleep(5)
-
-
-def con_mysql_silence(
-        host: str,
-        username: str,
-        password: str,
-        db_name: str = None,
-        port: int = 3306,
-        charset: str = 'utf8',
-        ssc: bool = False
-):
-    """
-    此函数为无提示信息的Mysql数据库连接函数的优化，内部预定义了连接的默认字符设置
-    当连接失败时，将倒计时5秒后重连，直到连接成功
-    此函数无运行提示
-    :param host:
-    :param db_name:
-    :param username:
-    :param password:
-    :param port: 默认端口为3306
-    :param charset: 默认字符集为utf8
-    :param ssc: 默认不使用流式游标
-    :return:(con, cur)
-    """
-    while True:
-        try:
-            con = pymysql.connect(
-                host=host,
-                db=db_name,
-                user=username,
-                passwd=password,
-                port=port,
-                charset=charset
-            )
-            if ssc is False:
-                cur = con.cursor()
+        except ConnectionError:
+            if auto_reconnect:
+                if not silence:
+                    showlog.error(f'Oops, ConnectionError, Trying to reconnect in {reconnect_wait} seconds ...')
+                time.sleep(reconnect_wait)
             else:
-                cur = pymysql.cursors.SSCursor(con)  # 使用流式游标
-            cur.execute(query='SET NAMES utf8mb4')
-            cur.execute(query='SET CHARACTER SET utf8mb4')
-            cur.execute(query='SET character_set_connection=utf8mb4')
-            return con, cur
+                return
+        except TimeoutError:
+            if auto_reconnect:
+                if not silence:
+                    showlog.error(f'Oops, TimeoutError, Trying to reconnect in {reconnect_wait} seconds ...')
+                time.sleep(reconnect_wait)
+            else:
+                return
         except:
-            time.sleep(5)
+            if auto_reconnect:
+                if not silence:
+                    showlog.error(f'Oops, connection failed, Trying to reconnect in {reconnect_wait} seconds ...')
+                time.sleep(reconnect_wait)
+            else:
+                return
 
 
 def con2db(
         con_info: dict,
         db_name: str = None,
-        silence: bool = silence_default,  # 默认为非静默模式
-        ssc: bool = False
+        silence: bool = silence_default,
+        ssc: bool = False,
+        auto_reconnect: bool = True,
+        reconnect_wait: int = 5
 ):
     """
     对连接数据库的方法再次优化，此处可以定义所有数据库的连接
+    包含重试机制
     :param con_info:设置连接的具体信息，必须包含：host、username、password，可选包含：port、charset
     :param db_name:设置需要连接的数据库
     :param silence:设置静默模式，为True表示静默，为False表示非静默
     :param ssc: 默认不使用流式游标
+    :param auto_reconnect: 自动重连
+    :param reconnect_wait: 重连等待时间，单位为秒，默认为5秒
     :return:connection，由(con, cur)组成，所以返回的效果是(con, cur)
     """
-    host = con_info.get("host")
-    username = con_info.get("username")
-    password = con_info.get("password")
-    port = con_info.get("port", 3306)
-    charset = con_info.get("charset", "utf8")
-    if silence is True:
-        connection = con_mysql_silence(
-            host=host,
-            db_name=db_name,
-            username=username,
-            password=password,
-            port=port,
-            charset=charset,
-            ssc=ssc
-        )
-        return connection
-    else:
-        connection = con_mysql(
-            host=host,
-            db_name=db_name,
-            username=username,
-            password=password,
-            port=port,
-            charset=charset,
-            ssc=ssc
-        )
-        return connection
+    return con_mysql(
+        host=con_info.get("host"),
+        db_name=db_name,
+        username=con_info.get("username"),
+        password=con_info.get("password"),
+        port=con_info.get("port", 3306),
+        charset=con_info.get("charset", "utf8"),
+        ssc=ssc,
+        silence=silence,
+        auto_reconnect=auto_reconnect,
+        reconnect_wait=reconnect_wait
+    )
 
 
 def _query(
@@ -218,402 +194,416 @@ def _query(
         con=None,
         parameter: tuple = None,
         operate: bool = False,  # 是否为操作
-        order_dict: bool = True
+        order_dict: bool = True,
+        silence: bool = silence_default,
+        auto_reconnect: bool = True,
+        reconnect_wait: int = 5
 ):
     """
     查询结果以list(dict)形式输出
+    包含重试机制
     :param sql:
     :param cur:
     :param con:
     :param parameter: 参数化查询语句避免SQL注入
     :param operate: 为True的时候执行操作（执行commit），为False的时候执行查询数据（不执行commit）
     :param order_dict: 返回值是否组成有序dict
+    :param silence:设置静默模式，为True表示静默，为False表示非静默
+    :param auto_reconnect: 自动重连
+    :param reconnect_wait: 重连等待时间，单位为秒，默认为5秒
     :return:
     """
-    try:
-        if parameter is None:
-            cur.execute(query=sql)
-        else:
+    while True:
+        try:
             cur.execute(query=sql, args=parameter)
-        if operate is False:
-            # 只查询
-            index = cur.description
-            result = list()
-            for res in cur.fetchall():
-                if order_dict is True:
-                    row = OrderedDict()
-                else:
-                    row = dict()
-                for i in range(len(index)):
-                    row[index[i][0]] = res[i]
-                result.append(row)
-            return result
-        else:
-            # 只操作
-            effect_rows = cur.rowcount
-            con.commit()
-            return effect_rows
-    except Exception as ex:
-        showlog.warning("Oops! there is an error occurred in query:%s , sql: %s ,parameter: %s" % (ex, sql, parameter))
-        return
+            if operate is False:
+                # 只查询
+                index = cur.description
+                result = list()
+                for res in cur.fetchall():
+                    if order_dict is True:
+                        row = OrderedDict()
+                    else:
+                        row = dict()
+                    for i in range(len(index)):
+                        row[index[i][0]] = res[i]
+                    result.append(row)
+                return result
+            else:
+                # 只操作
+                effect_rows = cur.rowcount
+                con.commit()
+                return effect_rows
+        except ConnectionError:
+            if auto_reconnect:
+                if not silence:
+                    showlog.error(f'Oops, ConnectionError, Trying to reconnect in {reconnect_wait} seconds ...')
+                time.sleep(reconnect_wait)
+            else:
+                return
+        except TimeoutError:
+            if auto_reconnect:
+                if not silence:
+                    showlog.error(f'Oops, TimeoutError, Trying to reconnect in {reconnect_wait} seconds ...')
+                time.sleep(reconnect_wait)
+            else:
+                return
+        except:
+            if auto_reconnect:
+                if not silence:
+                    showlog.error(f'Oops, Error, Trying to reconnect in {reconnect_wait} seconds ...')
+                time.sleep(reconnect_wait)
+            else:
+                return
 
 
 def query_table_all_data(
         db_name: str,  # 必须为内部参数，防止注入
         tb_name: str,  # 必须为内部参数，防止注入
         con_info: dict = None,  # 若指定，将优先使用
-        env_file_name: str = 'mysql.env',
+        env_file_name: str = env_file_name_default,
         order_col: str = None,  # 需要排序的列，必须为内部参数，防止注入
         order_index: str = "DESC",  # 排序规则，必须为内部参数，防止注入
         silence: bool = silence_default,
-        order_dict: bool = True
+        order_dict: bool = True,
+        auto_reconnect: bool = True,
+        reconnect_wait: int = 5
 ):
     """
+    获取表所有数据
+    包含重试机制
+    :param db_name: 必须为内部参数，防止注入
+    :param tb_name: 必须为内部参数，防止注入
+    :param con_info: 若指定，将优先使用
+    :param env_file_name: 自动重连
+    :param order_col: 需要排序的列，必须为内部参数，防止注入
+    :param order_index: 排序规则，必须为内部参数，防止注入
+    :param silence: 静默参数
+    :param order_dict:
+    :param auto_reconnect: 自动重连
+    :param reconnect_wait: 重连等待时间，单位为秒，默认为5秒
     查询某个表的所有数据
     查询结果以list(dict)形式输出
     """
     # ---------------- 固定设置 ----------------
-    if con_info is None:
+    if not con_info:
         con_info = make_con_info(
             env_file_name=env_file_name,
             silence=silence
         )
-    else:
-        pass
+    con, cur = con2db(
+        con_info=con_info,
+        db_name=db_name,
+        silence=silence,
+        auto_reconnect=auto_reconnect,
+        reconnect_wait=reconnect_wait
+    )  # 已包含重试机制
     # ---------------- 固定设置 ----------------
     try:
-        con, cur = con2db(
-            con_info=con_info,
-            db_name=db_name,
-            silence=silence
-        )
         if order_col is None:
-            sql = "SELECT * FROM `%s`.`%s`" % (db_name, tb_name)
-            parameter = None
+            sql = f"SELECT * FROM `{db_name}`.`{tb_name}`"
         else:
-            sql = "SELECT * FROM `%s`.`%s` ORDER BY %s %s" % (db_name, tb_name, order_col, order_index)
-            parameter = None
-        if silence is True:
-            try:
-                res = _query(
-                    cur=cur,
-                    sql=sql,
-                    parameter=parameter,
-                    order_dict=order_dict
-                )
-                return res
-            except Exception as ex:
-                return
-        else:
-            showlog.info("Executing sql：%s ..." % sql)
-            try:
-                res = _query(
-                    cur=cur,
-                    sql=sql,
-                    parameter=parameter,
-                    order_dict=order_dict
-                )
+            sql = f"SELECT * FROM `{db_name}`.`{tb_name}` ORDER BY `{order_col}` {order_index}"
+
+        if not silence:
+            showlog.info(f"Executing sql：{sql} ...")
+        try:
+            res = _query(
+                cur=cur,
+                sql=sql,
+                order_dict=order_dict,
+                auto_reconnect=auto_reconnect,
+                reconnect_wait=reconnect_wait,
+                silence=silence
+            )
+            if not silence:
                 showlog.info("Executing sql success.")
-                return res
-            except Exception as ex:
-                showlog.warning("Oops! an error occurred, maybe query error. Exception: %s" % ex)
-                return
+            return res
+        except Exception as ex:
+            if not silence:
+                showlog.warning(f"Oops! an error occurred, Exception: {ex}")
+            return
     except Exception as ex:
-        showlog.warning("Oops! an error occurred, maybe con2db error. Exception: %s" % ex)
+        if not silence:
+            showlog.warning(f"Oops! an error occurred, Exception: {ex}")
         return
 
 
 def query_by_sql(
-        sql: str,  # 参数用%s表示
-        parameter: tuple = None,  # 参数化查询避免sql注入
+        sql: str,
+        parameter: tuple = None,
         db_name: str = None,
-        con_info: dict = None,  # 若指定，将优先使用
-        env_file_name: str = 'mysql.env',
+        con_info: dict = None,
+        env_file_name: str = env_file_name_default,
         silence: bool = silence_default,
-        order_dict: bool = True
+        order_dict: bool = True,
+        auto_reconnect: bool = True,
+        reconnect_wait: int = 5
 ):
     """
+    按照sql查询
+    【包含重试机制】
+    :param sql: 参数用%s表示
+    :param parameter: 参数化查询避免sql注入
+    :param db_name:
+    :param con_info: 若指定，将优先使用
+    :param env_file_name:
+    :param silence:
+    :param order_dict:
+    :param auto_reconnect: 自动重连
+    :param reconnect_wait: 重连等待时间，单位为秒，默认为5秒
     按照sql查询
     查询结果以list(dict)形式输出
     """
     # ---------------- 固定设置 ----------------
-    if con_info is None:
+    if not con_info:
         con_info = make_con_info(
             env_file_name=env_file_name,
             silence=silence
         )
-    else:
-        pass
+    con, cur = con2db(
+        con_info=con_info,
+        db_name=db_name,
+        silence=silence,
+        auto_reconnect=auto_reconnect,
+        reconnect_wait=reconnect_wait
+    )  # 已包含重试机制
     # ---------------- 固定设置 ----------------
     try:
-        con, cur = con2db(
-            con_info=con_info,
-            db_name=db_name,
-            silence=silence
-        )
-        if silence is True:
-            try:
-                res = _query(
-                    cur=cur,
-                    sql=sql,
-                    parameter=parameter,
-                    order_dict=order_dict
-                )
-                return res
-            except Exception as ex:
-                showlog.warning("Oops! an error occurred, maybe query error. Exception: %s" % ex)
-                return
-        else:
-            showlog.info("Executing sql：%s ..." % sql)
-            try:
-                res = _query(
-                    cur=cur,
-                    sql=sql,
-                    parameter=parameter,
-                    order_dict=order_dict
-                )
+        if not silence:
+            showlog.info(f"Executing sql：{sql} ...")
+        try:
+            res = _query(
+                cur=cur,
+                sql=sql,
+                parameter=parameter,
+                order_dict=order_dict,
+                auto_reconnect=auto_reconnect,
+                reconnect_wait=reconnect_wait,
+                silence=silence
+            )
+            if not silence:
                 showlog.info("Executing sql success.")
-                return res
-            except Exception as ex:
-                showlog.warning("Oops! an error occurred, maybe query error. Exception: %s" % ex)
-                return
+            return res
+        except Exception as ex:
+            if not silence:
+                showlog.warning("Oops! an error occurred, Exception: %s" % ex)
+            return
     except Exception as ex:
-        showlog.warning("Oops! an error occurred, maybe con2db error. Exception: %s" % ex)
+        if not silence:
+            showlog.warning("Oops! an error occurred, Exception: %s" % ex)
         return
 
 
 def do_by_sql(
-        sql: str,  # 参数用%s表示
-        parameter: tuple = None,  # 参数化查询避免sql注入
+        sql: str,
+        parameter: tuple = None,
         db_name: str = None,
-        con_info: dict = None,  # 若指定，将优先使用
-        env_file_name: str = 'mysql.env',
+        con_info: dict = None,
+        env_file_name: str = env_file_name_default,
         silence: bool = silence_default,
         order_dict: bool = True,
-        auto_reconnect: bool = True
+        auto_reconnect: bool = True,
+        reconnect_wait: int = 5
 ):
     """
     按照sql执行
     查询结果以list(dict)形式输出
+    【包含重试机制】
+    :param sql: 参数用%s表示
+    :param parameter: 参数化查询避免sql注入
+    :param db_name:
+    :param con_info: 若指定，将优先使用
+    :param env_file_name:
+    :param silence:
+    :param order_dict:
+    :param auto_reconnect: 自动重连
+    :param reconnect_wait: 重连等待时间，单位为秒，默认为5秒
     """
     # ---------------- 固定设置 ----------------
-    if con_info is None:
+    if not con_info:
         con_info = make_con_info(
             env_file_name=env_file_name,
             silence=silence
         )
-    else:
-        pass
+    con, cur = con2db(
+        con_info=con_info,
+        db_name=db_name,
+        silence=silence,
+        auto_reconnect=auto_reconnect,
+        reconnect_wait=reconnect_wait
+    )  # 已包含重试机制
     # ---------------- 固定设置 ----------------
-    try:
-        con, cur = con2db(
-            con_info=con_info,
-            db_name=db_name,
-            silence=silence
-        )
-        while True:
-            try:
-                if silence is True:
-                    pass
-                else:
-                    showlog.info("Executing sql：%s ..." % sql)
-                effect_rows = _query(
-                    sql=sql,
-                    parameter=parameter,
-                    cur=cur,
-                    con=con,
-                    operate=True,
-                    order_dict=order_dict
-                )
-                if silence is True:
-                    pass
-                else:
-                    showlog.info("Executing sql success.")
-                return effect_rows
-            except ConnectionAbortedError:
-                if silence is False:
-                    showlog.error("ConnectionAbortedError. sql: %s" % sql)
-                    showlog.warning('try to reconnect in 1 second...')
-                else:
-                    pass
-                if auto_reconnect:
-                    time.sleep(1)
-                else:
-                    return False
-            except TimeoutError:
-                if silence is False:
-                    showlog.error("TimeoutError. sql: %s" % sql)
-                    showlog.warning('try to reconnect in 1 second...')
-                else:
-                    pass
-                if auto_reconnect:
-                    time.sleep(1)
-                else:
-                    return False
-            except Exception as ex:
-                if silence is True:
-                    pass
-                else:
-                    showlog.warning("Oops! an error occurred, maybe query error. Exception: %s" % ex)
-                return
-    except Exception as ex:
-        if silence is True:
-            pass
-        else:
-            showlog.warning("Oops! an error occurred, maybe con2db error. Exception: %s" % ex)
-        return
+    if not silence:
+        showlog.info("Executing sql：%s ..." % sql)
+    effect_rows = _query(
+        sql=sql,
+        parameter=parameter,
+        cur=cur,
+        con=con,
+        operate=True,
+        order_dict=order_dict,
+        auto_reconnect=auto_reconnect,
+        reconnect_wait=reconnect_wait,
+        silence=silence
+    )
+    if not silence:
+        showlog.info("Executing sql success.")
+    return effect_rows
 
 
 def data_bases(
-        con_info: dict = None,  # 若指定，将优先使用
-        env_file_name: str = 'mysql.env',
+        con_info: dict = None,
+        env_file_name: str = env_file_name_default,
         silence: bool = silence_default,
-        order_dict: bool = True
+        order_dict: bool = True,
+        auto_reconnect: bool = True,
+        reconnect_wait: int = 5
 ):
     """
     获取MySQL的连接权限范围内的所有db列表
+    【包含重试机制】
+    :param con_info: 若指定，将优先使用
+    :param env_file_name:
+    :param silence:
+    :param order_dict:
+    :param auto_reconnect: 自动重连
+    :param reconnect_wait: 重连等待时间，单位为秒，默认为5秒
     """
     # ---------------- 固定设置 ----------------
-    if con_info is None:
+    if not con_info:
         con_info = make_con_info(
             env_file_name=env_file_name,
             silence=silence
         )
-    else:
-        pass
+    con, cur = con2db(
+        con_info=con_info,
+        silence=silence,
+        auto_reconnect=auto_reconnect,
+        reconnect_wait=reconnect_wait
+    )  # 已包含重试机制
     # ---------------- 固定设置 ----------------
+    sql = "SHOW DATABASES;"
+    if not silence:
+        showlog.info("Executing sql：%s ..." % sql)
     try:
-        con, cur = con2db(
-            con_info=con_info,
+        res = _query(
+            cur=cur,
+            sql=sql,
+            order_dict=order_dict,
+            auto_reconnect=auto_reconnect,
+            reconnect_wait=reconnect_wait,
             silence=silence
         )
-        sql = "SHOW DATABASES;"
-        if silence is True:
-            try:
-                res = _query(
-                    cur=cur,
-                    sql=sql,
-                    order_dict=order_dict
-                )
-                inner_db_list = list()
-                for each in res:
-                    for k, v in each.items():
-                        inner_db_list.append(v)
-                return inner_db_list
-            except Exception as ex:
-                showlog.warning("Oops! an error occurred, maybe query error. Exception: %s" % ex)
-                return
-        else:
-            showlog.info("Executing sql：%s ..." % sql)
-            try:
-                res = _query(
-                    cur=cur,
-                    sql=sql,
-                    order_dict=order_dict
-                )
-                showlog.info("Executing sql success.")
-                inner_db_list = list()
-                for each in res:
-                    for k, v in each.items():
-                        inner_db_list.append(v)
-                return inner_db_list
-            except Exception as ex:
-                showlog.warning("Oops! an error occurred, maybe query error. Exception: %s" % ex)
-                return
+        if not silence:
+            showlog.info("Executing sql success.")
+        inner_db_list = list()
+        for each in res:
+            for k, v in each.items():
+                inner_db_list.append(v)
+        return inner_db_list
     except Exception as ex:
-        showlog.warning("Oops! an error occurred, maybe con2db error. Exception: %s" % ex)
+        if not silence:
+            showlog.warning("Oops! an error occurred, Exception: %s" % ex)
         return
 
 
 def tables(
-        db_name: str = None,  # 指定数据库，若不指定，将获取所有
-        con_info: dict = None,  # 若指定，将优先使用
-        env_file_name: str = 'mysql.env',
+        db_name: str = None,
+        con_info: dict = None,
+        env_file_name: str = env_file_name_default,
         silence: bool = silence_default,
-        order_dict: bool = True
+        order_dict: bool = True,
+        auto_reconnect: bool = True,
+        reconnect_wait: int = 5
 ):
     """
-        获取所有表，若不指定db_name，将获取所有
+    获取所有表，若不指定db_name，将获取所有
+    【包含重试机制】
+    :param db_name: 指定数据库，若不指定，将获取所有
+    :param con_info: 若指定，将优先使用
+    :param env_file_name:
+    :param silence:
+    :param order_dict:
+    :param auto_reconnect: 自动重连
+    :param reconnect_wait: 重连等待时间，单位为秒，默认为5秒
     """
     # ---------------- 固定设置 ----------------
-    if con_info is None:
+    if not con_info:
         con_info = make_con_info(
             env_file_name=env_file_name,
             silence=silence
         )
-    else:
-        pass
+    con, cur = con2db(
+        con_info=con_info,
+        db_name=db_name,
+        silence=silence,
+        auto_reconnect=auto_reconnect,
+        reconnect_wait=reconnect_wait
+    )  # 已包含重试机制
     # ---------------- 固定设置 ----------------
+    sql = "SHOW TABLES;"
+    if not silence:
+        showlog.info("Executing sql：%s ..." % sql)
     try:
-        con, cur = con2db(
-            con_info=con_info,
-            db_name=db_name,
+        res = _query(
+            cur=cur,
+            sql=sql,
+            order_dict=order_dict,
+            auto_reconnect=auto_reconnect,
+            reconnect_wait=reconnect_wait,
             silence=silence
         )
-        sql = "SHOW TABLES;"
-        if silence is True:
-            try:
-                res = _query(
-                    cur=cur,
-                    sql=sql,
-                    order_dict=order_dict
-                )
-                table_list = list()
-                for each in res:
-                    for k, v in each.items():
-                        table_list.append(v)
-                return table_list
-            except:
-                return
-        else:
-            showlog.info("Executing sql：%s ..." % sql)
-            try:
-                res = _query(
-                    cur=cur,
-                    sql=sql,
-                    order_dict=order_dict
-                )
-                showlog.info("Executing sql success.")
-                table_list = list()
-                for each in res:
-                    for k, v in each.items():
-                        table_list.append(v)
-                return table_list
-            except Exception as ex:
-                showlog.warning("Oops! an error occurred, maybe query error. Exception: %s" % ex)
-                return
+        if not silence:
+            showlog.info("Executing sql success.")
+        table_list = list()
+        for each in res:
+            for k, v in each.items():
+                table_list.append(v)
+        return table_list
     except Exception as ex:
-        showlog.warning("Oops! an error occurred, maybe con2db error. Exception: %s" % ex)
+        if not silence:
+            showlog.warning("Oops! an error occurred, maybe query error. Exception: %s" % ex)
         return
 
 
 def tb_info(
         db_name: str,
         tb_name: str,
-        con_info: dict = None,  # 若指定，将优先使用
-        env_file_name: str = 'mysql.env',
-        silence: bool = silence_default
+        con_info: dict = None,
+        env_file_name: str = env_file_name_default,
+        silence: bool = silence_default,
+        auto_reconnect: bool = True,
+        reconnect_wait: int = 5
 ):
     """
     输出表信息，其中：
     COLUMN_NAME：列名
     DATA_TYPE：数据类型
+    【包含重试机制】
+    :param db_name:
+    :param tb_name:
+    :param con_info: 若指定，将优先使用
+    :param env_file_name:
+    :param silence:
+    :param auto_reconnect: 自动重连
+    :param reconnect_wait: 重连等待时间，单位为秒，默认为5秒
     """
     # ---------------- 固定设置 ----------------
-    if con_info is None:
+    if not con_info:
         con_info = make_con_info(
             env_file_name=env_file_name,
             silence=silence
         )
-    else:
-        pass
     # ---------------- 固定设置 ----------------
     where_string = "TABLE_SCHEMA='%s' and TABLE_NAME='%s'" % (db_name, tb_name)
     sql = "SELECT * FROM `information_schema`.`COLUMNS` WHERE %s" % where_string
     res = query_by_sql(
         sql=sql,
-        silence=silence,
-        con_info=con_info
+        con_info=con_info,
+        auto_reconnect=auto_reconnect,
+        reconnect_wait=reconnect_wait,
+        silence=silence
     )
     return res
 
@@ -622,25 +612,38 @@ def column_list(
         db_name: str,
         tb_name: str,
         con_info: dict = None,  # 若指定，将优先使用
-        env_file_name: str = 'mysql.env',
+        env_file_name: str = env_file_name_default,
         silence: bool = silence_default,
-        order_dict: bool = True
+        order_dict: bool = True,
+        auto_reconnect: bool = True,
+        reconnect_wait: int = 5
 ):
+    """
+    【包含重试机制】
+    :param db_name:
+    :param tb_name:
+    :param con_info: 若指定，将优先使用
+    :param env_file_name:
+    :param silence:
+    :param order_dict:
+    :param auto_reconnect: 自动重连
+    :param reconnect_wait: 重连等待时间，单位为秒，默认为5秒
+    """
     # ---------------- 固定设置 ----------------
-    if con_info is None:
+    if not con_info:
         con_info = make_con_info(
             env_file_name=env_file_name,
             silence=silence
         )
-    else:
-        pass
+    con, cur = con2db(
+        con_info=con_info,
+        db_name=db_name,
+        silence=silence,
+        auto_reconnect=auto_reconnect,
+        reconnect_wait=reconnect_wait
+    )  # 已包含重试机制
     # ---------------- 固定设置 ----------------
     try:
-        con, cur = con2db(
-            con_info=con_info,
-            db_name=db_name,
-            silence=silence
-        )
         sql1 = """
         SELECT
             `COLUMN_NAME` 
@@ -654,7 +657,10 @@ def column_list(
             cur=cur,
             sql=sql1,
             parameter=(db_name, tb_name),
-            order_dict=order_dict
+            order_dict=order_dict,
+            auto_reconnect=auto_reconnect,
+            reconnect_wait=reconnect_wait,
+            silence=silence
         )
         all_col_list = list()
         for each in all_col_dict:
@@ -672,7 +678,10 @@ def column_list(
             cur=cur,
             sql=sql2,
             parameter=(db_name, tb_name),
-            order_dict=order_dict
+            order_dict=order_dict,
+            auto_reconnect=auto_reconnect,
+            reconnect_wait=reconnect_wait,
+            silence=silence
         )
         pk_col_list = list()
         for each in pk_col_dict:
@@ -691,32 +700,42 @@ def column_list(
 
 def query_to_pd(
         sql: str,
+        db_name: str = None,
         parameter=None,
         con_info: dict = None,  # 若指定，将优先使用
-        env_file_name: str = 'mysql.env',
-        silence: bool = silence_default
+        env_file_name: str = env_file_name_default,
+        silence: bool = silence_default,
+        auto_reconnect: bool = True,
+        reconnect_wait: int = 5
 ):
     """
     针对数据量较大的情况，将数据存储到pd中
+    【包含重试机制】
+    :param sql:
+    :param db_name:
+    :param parameter:
+    :param con_info: 若指定，将优先使用
+    :param env_file_name:
+    :param silence:
+    :param auto_reconnect: 自动重连
+    :param reconnect_wait: 重连等待时间，单位为秒，默认为5秒
     """
     # ---------------- 固定设置 ----------------
-    if con_info is None:
+    if not con_info:
         con_info = make_con_info(
             env_file_name=env_file_name,
             silence=silence
         )
-    else:
-        pass
+    con, cur = con2db(
+        con_info=con_info,
+        db_name=db_name,
+        silence=silence,
+        auto_reconnect=auto_reconnect,
+        reconnect_wait=reconnect_wait
+    )  # 已包含重试机制
     # ---------------- 固定设置 ----------------
     try:
-        con, cur = con2db(
-            con_info=con_info,
-            silence=silence
-        )
-        if parameter is None:
-            cur.execute(query=sql)
-        else:
-            cur.execute(query=sql, args=parameter)
+        cur.execute(query=sql, args=parameter)
         index = cur.description
         columns = list()
         for each in index:
@@ -739,28 +758,38 @@ def information_schema(
         db_name: str,
         table_name: str,
         con_info: dict = None,  # 若指定，将优先使用
-        env_file_name: str = 'mysql.env',
-        silence: bool = silence_default
+        env_file_name: str = env_file_name_default,
+        silence: bool = silence_default,
+        auto_reconnect: bool = True,
+        reconnect_wait: int = 5
 ):
     """
     输出表信息，其中：
     COLUMN_NAME：列名
     DATA_TYPE：数据类型
+    【包含重试机制】
+    :param db_name:
+    :param table_name:
+    :param con_info: 若指定，将优先使用
+    :param env_file_name:
+    :param silence:
+    :param auto_reconnect: 自动重连
+    :param reconnect_wait: 重连等待时间，单位为秒，默认为5秒
     """
     # ---------------- 固定设置 ----------------
-    if con_info is None:
+    if not con_info:
         con_info = make_con_info(
             env_file_name=env_file_name,
             silence=silence
         )
-    else:
-        pass
     # ---------------- 固定设置 ----------------
     where_string = "TABLE_SCHEMA='%s' and TABLE_NAME='%s'" % (db_name, table_name)
     sql = "SELECT * FROM `information_schema`.`COLUMNS` WHERE %s;" % where_string
     res = query_by_sql(
         sql=sql,
         con_info=con_info,
+        auto_reconnect=auto_reconnect,
+        reconnect_wait=reconnect_wait,
         silence=silence
     )
     return res
@@ -771,11 +800,16 @@ def clean_data(
         column_info_dict: dict,
         db_name: str,
         tb_name: str,
-        replace_space_to_none: bool = True  # 自动将空值null改为None
+        replace_space_to_none: bool = True,  # 自动将空值null改为None
 ):
     """
     功能性模块
     格式化数据
+    :param data_dict_list:
+    :param column_info_dict:
+    :param db_name:
+    :param tb_name:
+    :param replace_space_to_none:
     """
     data_dict_list_temp = copy.deepcopy(data_dict_list)  # 深度拷贝，不更改源数据
     all_col_list = column_info_dict.get('all_col_list')  # 所有列名
@@ -825,27 +859,44 @@ def clean_data(
 
 
 def replace_into(
-        data_dict_list: list,  # 数据[{},{}]
-        db_name: str,  # 数据库名
-        tb_name: str,  # 表名
-        con_info: dict = None,  # 若指定，将优先使用
-        env_file_name: str = 'mysql.env',
-        pk_col_list: list = None,  # 主键列表
-        silence: bool = silence_default
+        data_dict_list: list,
+        db_name: str,
+        tb_name: str,
+        con_info: dict = None,
+        env_file_name: str = env_file_name_default,
+        pk_col_list: list = None,
+        silence: bool = silence_default,
+        auto_reconnect: bool = True,
+        reconnect_wait: int = 5
 ):
     """
     插入和自动更新，注意，这里的更新是先对原来的数据删除，再插入，不适用于局部更新！
+    【包含重试机制】
+    :param data_dict_list: 数据[{},{}]
+    :param db_name: 数据库名
+    :param tb_name: 表名
+    :param con_info: 若指定，将优先使用
+    :param env_file_name:
+    :param pk_col_list: 主键列表
+    :param silence:
+    :param auto_reconnect: 自动重连
+    :param reconnect_wait: 重连等待时间，单位为秒，默认为5秒
     """
     # ---------------- 固定设置 ----------------
-    if con_info is None:
+    if not con_info:
         con_info = make_con_info(
             env_file_name=env_file_name,
             silence=silence
         )
-    else:
-        pass
+    con, cur = con2db(
+        con_info=con_info,
+        db_name=db_name,
+        silence=silence,
+        auto_reconnect=auto_reconnect,
+        reconnect_wait=reconnect_wait
+    )  # 已包含重试机制
     # ---------------- 固定设置 ----------------
-    if data_dict_list is None or len(data_dict_list) == 0:
+    if not data_dict_list:
         return True
     else:
         try:
@@ -853,15 +904,17 @@ def replace_into(
                 db_name=db_name,
                 tb_name=tb_name,
                 con_info=con_info,
+                auto_reconnect=auto_reconnect,
+                reconnect_wait=reconnect_wait,
                 silence=silence
             )  # 获取列名信息
-            if column_info is not None:  # 若未获取到列名信息，提示错误并退出
+            if column_info:  # 若未获取到列名信息，提示错误并退出
                 all_col_list, pk_col_list_get, data_col_list = column_info  # 获取到列名信息
                 column_info_dict = {
                     'all_col_list': all_col_list,
                     'data_col_list': data_col_list,
                 }
-                if pk_col_list is not None:
+                if pk_col_list:
                     column_info_dict['pk_col_list'] = pk_col_list  # 使用自定义主键列表
                 else:
                     column_info_dict['pk_col_list'] = pk_col_list_get  # 使用数据库中定义的主键列表
@@ -870,51 +923,43 @@ def replace_into(
                     column_info_dict=column_info_dict,
                     data_dict_list=data_dict_list,
                     db_name=db_name,
-                    tb_name=tb_name
+                    tb_name=tb_name,
                 )
-                connection = con2db(
-                    con_info=con_info,
-                    db_name=db_name,
-                    silence=silence
-                )  # 连接数据库
-                if connection is not None:
-                    con, cur = connection
+                while True:
                     try:
-                        if silence is False:
+                        if not silence:
                             showlog.info('operating %s data...' % len(data_list_single))
-                        else:
-                            pass
                         cur.executemany(query=operate_clause, args=list(data_list_single))
                         con.commit()
-                        if silence is False:
+                        if not silence:
                             showlog.info("operate success.")
-                        else:
-                            pass
                         return True
+                    except ConnectionError:
+                        if auto_reconnect:
+                            if not silence:
+                                showlog.error(f'Oops, ConnectionError, Trying to reconnect in {reconnect_wait} seconds ...')
+                            time.sleep(reconnect_wait)
+                        else:
+                            return
+                    except TimeoutError:
+                        if auto_reconnect:
+                            if not silence:
+                                showlog.error(f'Oops, TimeoutError, Trying to reconnect in {reconnect_wait} seconds ...')
+                            time.sleep(reconnect_wait)
+                        else:
+                            return
                     except:
-                        if silence is False:
+                        if not silence:
                             showlog.error("operate failure.operate_clause: %s" % operate_clause)
                             print(operate_clause, list(data_list_single)[0])
-                        else:
-                            pass
                         return False
-                else:
-                    if silence is False:
-                        showlog.warning("Oops! can't get connection.")
-                    else:
-                        pass
-                    return False
             else:
-                if silence is False:
+                if not silence:
                     showlog.warning("Oops! can't get column_info.")
-                else:
-                    pass
                 return False
         except:
-            if silence is False:
+            if not silence:
                 showlog.error("Oops! an error occurred!")
-            else:
-                pass
             return False
 
 
@@ -922,23 +967,39 @@ def insert(
         data_dict_list: list,
         db_name: str,
         tb_name: str,
-        con_info: dict = None,  # 若指定，将优先使用
-        env_file_name: str = 'mysql.env',
-        replace_space_to_none: bool = True,  # 自动将空值null改为None
+        con_info: dict = None,
+        env_file_name: str = env_file_name_default,
+        replace_space_to_none: bool = True,
         silence: bool = silence_default,
-        auto_reconnect: bool = True
+        auto_reconnect: bool = True,
+        reconnect_wait: int = 5
 ):
     """
     此模块的功能是插入和自动更新
+    【包含重试机制】
+    :param data_dict_list:
+    :param db_name:
+    :param tb_name:
+    :param con_info: 若指定，将优先使用
+    :param env_file_name:
+    :param replace_space_to_none: 自动将空值null改为None
+    :param silence:
+    :param auto_reconnect: 自动重连
+    :param reconnect_wait: 重连等待时间，单位为秒，默认为5秒
     """
     # ---------------- 固定设置 ----------------
-    if con_info is None:
+    if not con_info:
         con_info = make_con_info(
             env_file_name=env_file_name,
             silence=silence
         )
-    else:
-        pass
+    con, cur = con2db(
+        con_info=con_info,
+        db_name=db_name,
+        silence=silence,
+        auto_reconnect=auto_reconnect,
+        reconnect_wait=reconnect_wait
+    )  # 已包含重试机制
     # ---------------- 固定设置 ----------------
     try:
         # 获取列名信息
@@ -946,110 +1007,83 @@ def insert(
             db_name=db_name,
             tb_name=tb_name,
             con_info=con_info,
+            auto_reconnect=auto_reconnect,
+            reconnect_wait=reconnect_wait,
             silence=silence
         )
-        if column_info is not None:  # 若未获取到列名信息，提示错误并退出
+        if column_info:  # 若未获取到列名信息，提示错误并退出
             all_col_list, pk_col_list, data_col_list = column_info  # 获取到列名信息
-            connection = con2db(
-                con_info=con_info,
-                db_name=db_name,
-                silence=silence
-            )  # 连接数据库
-            if connection is not None:
-                con, cur = connection
-                # 按照目标表的结构格式化data_dict_list，去除额外列的数据，只保留预设列的数据
-                insert_param_set = set()
-                for each_data_dict in data_dict_list:  # 遍历数据list里的所有dict
-                    each_data_dict_in = each_data_dict.copy()  # 复制一份避免发生更改dict的错误
-                    for each in each_data_dict_in:  # 遍历单个dict的所有的key
-                        if each in all_col_list:  # 若key在all_col_list中，则收集该key，否则将删除key以及对应的数据，最终得到需要插入数据的列名列表
-                            insert_param_set.add(each)
-                        else:
-                            del each_data_dict[each]
+            # 按照目标表的结构格式化data_dict_list，去除额外列的数据，只保留预设列的数据
+            insert_param_set = set()
+            for each_data_dict in data_dict_list:  # 遍历数据list里的所有dict
+                each_data_dict_in = each_data_dict.copy()  # 复制一份避免发生更改dict的错误
+                for each in each_data_dict_in:  # 遍历单个dict的所有的key
+                    if each in all_col_list:  # 若key在all_col_list中，则收集该key，否则将删除key以及对应的数据，最终得到需要插入数据的列名列表
+                        insert_param_set.add(each)
+                    else:
+                        del each_data_dict[each]
 
-                insert_param_list = list(insert_param_set)  # 生成插入参数list
-                insert_clause_tuple = "`,`".join(insert_param_list)
-                insert_data_arg_list = list()
-                for _ in insert_param_list:
-                    insert_data_arg_list.append("%s")
-                insert_data_tuple = ",".join(insert_data_arg_list)
-                # 生成插入语句模板
-                insert_clause = 'INSERT INTO `%s`.`%s`(`%s`) VALUES(%s)' % \
-                                (db_name, tb_name, insert_clause_tuple, insert_data_tuple)
+            insert_param_list = list(insert_param_set)  # 生成插入参数list
+            insert_clause_tuple = "`,`".join(insert_param_list)
+            insert_data_arg_list = list()
+            for _ in insert_param_list:
+                insert_data_arg_list.append("%s")
+            insert_data_tuple = ",".join(insert_data_arg_list)
+            # 生成插入语句模板
+            insert_clause = f'INSERT INTO `{db_name}`.`{tb_name}`(`{insert_clause_tuple}`) VALUES({insert_data_tuple})'
 
-                # 生成插入数据tuple
-                insert_data_list = list()
-                for each_data_dict in data_dict_list:
-                    each_insert_data_list = list()
-                    for each_data_key in insert_param_list:
-                        if each_data_dict.get(each_data_key) == "":
-                            if replace_space_to_none is True:
-                                each_insert_data_list.append(None)
-                            else:
-                                each_insert_data_list.append("")
+            # 生成插入数据tuple
+            insert_data_list = list()
+            for each_data_dict in data_dict_list:
+                each_insert_data_list = list()
+                for each_data_key in insert_param_list:
+                    if each_data_dict.get(each_data_key) == "":
+                        if replace_space_to_none is True:
+                            each_insert_data_list.append(None)
                         else:
-                            each_insert_data_list.append(each_data_dict.get(each_data_key))
-                    insert_data_list.append(tuple(each_insert_data_list))
+                            each_insert_data_list.append("")
+                    else:
+                        each_insert_data_list.append(each_data_dict.get(each_data_key))
+                insert_data_list.append(tuple(each_insert_data_list))
 
-                insert_data_list = set(insert_data_list)  # set去重
+            insert_data_list = set(insert_data_list)  # set去重
 
-                while True:
-                    try:
-                        if silence is False:
-                            showlog.info('Inserting %s data...' % len(insert_data_list))
-                        else:
-                            pass
-                        cur.executemany(query=insert_clause, args=list(insert_data_list))
-                        con.commit()
-                        if silence is False:
-                            showlog.info("Insert success.")
-                        else:
-                            pass
-                        return True
-                    except ConnectionAbortedError:
-                        if silence is False:
-                            showlog.error("ConnectionAbortedError. insert_clause: %s" % insert_clause)
-                            showlog.warning('try to reconnect in 1 second...')
-                        else:
-                            pass
-                        if auto_reconnect:
-                            time.sleep(1)
-                        else:
-                            return False
-                    except TimeoutError:
-                        if silence is False:
-                            showlog.error("TimeoutError. insert_clause: %s" % insert_clause)
-                            showlog.warning('try to reconnect in 1 second...')
-                        else:
-                            pass
-                        if auto_reconnect:
-                            time.sleep(1)
-                        else:
-                            return False
-                    except:
-                        if silence is False:
-                            showlog.error("Insert failure. insert_clause: %s" % insert_clause)
-                            print(insert_clause, list(insert_data_list)[0])
-                        else:
-                            pass
-                        return False
-            else:
-                if silence is False:
-                    showlog.warning("Oops! can't get connection.")
-                else:
-                    pass
-                return False
+            while True:
+                try:
+                    if not silence:
+                        showlog.info('Inserting %s data...' % len(insert_data_list))
+                    cur.executemany(query=insert_clause, args=list(insert_data_list))
+                    con.commit()
+                    if not silence:
+                        showlog.info("Insert success.")
+                    return True
+                except ConnectionError:
+                    if auto_reconnect:
+                        if not silence:
+                            showlog.error(f'Oops, ConnectionError, Trying to reconnect in {reconnect_wait} seconds ...')
+                        time.sleep(reconnect_wait)
+                    else:
+                        return
+                except TimeoutError:
+                    if auto_reconnect:
+                        if not silence:
+                            showlog.error(f'Oops, TimeoutError, Trying to reconnect in {reconnect_wait} seconds ...')
+                        time.sleep(reconnect_wait)
+                    else:
+                        return
+                except:
+                    if not silence:
+                        showlog.error("Insert failure. insert_clause: %s" % insert_clause)
+                        print(insert_clause, list(insert_data_list)[0])
+                    return False
         else:
-            if silence is False:
+            if not silence:
                 showlog.warning("Oops! can't get column_info.")
-            else:
-                pass
             return False
     except:
-        if silence is False:
+        if not silence:
             showlog.error("Oops! an error occurred!")
-        else:
-            return False
+        return False
 
 
 def update(
@@ -1057,28 +1091,38 @@ def update(
         db_name: str,
         tb_name: str,
         con_info: dict = None,  # 若指定，将优先使用
-        env_file_name: str = 'mysql.env',
+        env_file_name: str = env_file_name_default,
         silence: bool = silence_default,
+        auto_reconnect: bool = True,
+        reconnect_wait: int = 5
 ):
     """
     针对MySQL的数据批量更新方法，不考虑data_dict_list为空或者无数据的情况，仅仅能批量更新，默认where条件是表格的主键，且空值不参与
     先连接目标数据库获取到目标表的结构信息
+    【包含重试机制】
     :param silence:设置上传的时候是否有提示信息
     :param con_info:连接信息
     :param env_file_name:设置连接数据库的信息
     :param db_name:需要上传到的目标数据库名称
     :param tb_name:需要上传到的目标数据表名称
     :param data_dict_list:需要上传的数据列表
+    :param auto_reconnect: 自动重连
+    :param reconnect_wait: 重连等待时间，单位为秒，默认为5秒
     :return:
     """
     # ---------------- 固定设置 ----------------
-    if con_info is None:
+    if not con_info:
         con_info = make_con_info(
             env_file_name=env_file_name,
             silence=silence
         )
-    else:
-        pass
+    con, cur = con2db(
+        con_info=con_info,
+        db_name=db_name,
+        silence=silence,
+        auto_reconnect=auto_reconnect,
+        reconnect_wait=reconnect_wait
+    )  # 已包含重试机制
     # ---------------- 固定设置 ----------------
     try:
         # 获取列名信息
@@ -1086,18 +1130,14 @@ def update(
             db_name=db_name,
             tb_name=tb_name,
             con_info=con_info,
+            auto_reconnect=auto_reconnect,
+            reconnect_wait=reconnect_wait,
             silence=silence
         )
         if column_info is not None:  # 若未获取到列名信息，提示错误并推出
             all_col_list, pk_col_list, data_col_list = column_info  # 获取到列名信息
-            connection = con2db(
-                con_info=con_info,
-                db_name=db_name,
-                silence=silence
-            )  # 连接数据库
-            if connection is not None:
-                con, cur = connection
-                # 按照目标表的结构格式化data_dict_list，去除额外列的数据，只保留预设列的数据
+            # 按照目标表的结构格式化data_dict_list，去除额外列的数据，只保留预设列的数据
+            while True:
                 try:
                     for each_data_dict in data_dict_list:  # 遍历数据list里的所有dict
 
@@ -1132,52 +1172,64 @@ def update(
                         where_string = " AND ".join(where_clause_list)  # 生成where语句完成
 
                         # where_string生成完成
-                        update_clause = 'UPDATE `%s`.`%s` SET %s WHERE %s' % \
-                                        (db_name, tb_name, set_string, where_string)
+                        update_clause = f'UPDATE `{db_name}`.`{tb_name}` SET {set_string} WHERE {where_string}'
                         # print(update_clause)
                         cur.execute(query=update_clause)
-                    con.commit()
-                    return 1
-                except:
-                    if silence is False:
-                        showlog.error("Update failure with update_clause: %s" % update_clause)
+                    return con.commit()
+                except ConnectionError:
+                    if auto_reconnect:
+                        if not silence:
+                            showlog.error(f'Oops, ConnectionError, Trying to reconnect in {reconnect_wait} seconds ...')
+                        time.sleep(reconnect_wait)
                     else:
                         return
-            else:
-                if silence is False:
-                    showlog.warning("Oops! can't get connection.")
-                else:
+                except TimeoutError:
+                    if auto_reconnect:
+                        if not silence:
+                            showlog.error(f'Oops, TimeoutError, Trying to reconnect in {reconnect_wait} seconds ...')
+                        time.sleep(reconnect_wait)
+                    else:
+                        return
+                except:
+                    if not silence:
+                        showlog.error("Update failure with update_clause: %s" % update_clause)
                     return
         else:
-            if silence is False:
+            if not silence:
                 showlog.warning("Oops! can't get column_info.")
-            else:
-                return
-    except:
-        if silence is False:
-            showlog.error("Oops! an error occurred!")
-        else:
             return
+    except:
+        if not silence:
+            showlog.error("Oops! an error occurred!")
+        return
 
 
 def show_create_table(
         db_name: str,
         tb_name: str,
         con_info: dict = None,  # 若指定，将优先使用
-        env_file_name: str = 'mysql.env',
-        silence: bool = silence_default
+        env_file_name: str = env_file_name_default,
+        silence: bool = silence_default,
+        auto_reconnect: bool = True,
+        reconnect_wait: int = 5
 ):
     """
     获取建表语句
+    【包含重试机制】
+    :param db_name:
+    :param tb_name:
+    :param con_info: 若指定，将优先使用
+    :param env_file_name:
+    :param silence:
+    :param auto_reconnect: 自动重连
+    :param reconnect_wait: 重连等待时间，单位为秒，默认为5秒
     """
     # ---------------- 固定设置 ----------------
-    if con_info is None:
+    if not con_info:
         con_info = make_con_info(
             env_file_name=env_file_name,
             silence=silence
         )
-    else:
-        pass
     # ---------------- 固定设置 ----------------
     sql = 'SHOW CREATE TABLE `%s`.`%s`;' % (db_name, tb_name)
     res = query_by_sql(
@@ -1185,10 +1237,11 @@ def show_create_table(
         sql=sql,
         env_file_name=env_file_name,
         con_info=con_info,
+        auto_reconnect=auto_reconnect,
+        reconnect_wait=reconnect_wait,
         silence=silence
     )
-    if res is None:
-        return None
+    if res:
+        return res[0]['Create Table']
     else:
-        create_table = res[0]['Create Table']
-        return create_table
+        return
