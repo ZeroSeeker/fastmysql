@@ -389,7 +389,8 @@ def do_by_sql(
         con_info: dict = None,  # 若指定，将优先使用
         env_file_name: str = 'mysql.env',
         silence: bool = silence_default,
-        order_dict: bool = True
+        order_dict: bool = True,
+        auto_reconnect: bool = True
 ):
     """
     按照sql执行
@@ -410,8 +411,12 @@ def do_by_sql(
             db_name=db_name,
             silence=silence
         )
-        if silence is True:
+        while True:
             try:
+                if silence is True:
+                    pass
+                else:
+                    showlog.info("Executing sql：%s ..." % sql)
                 effect_rows = _query(
                     sql=sql,
                     parameter=parameter,
@@ -420,28 +425,42 @@ def do_by_sql(
                     operate=True,
                     order_dict=order_dict
                 )
+                if silence is True:
+                    pass
+                else:
+                    showlog.info("Executing sql success.")
                 return effect_rows
+            except ConnectionAbortedError:
+                if silence is False:
+                    showlog.error("ConnectionAbortedError. sql: %s" % sql)
+                    showlog.warning('try to reconnect in 1 second...')
+                else:
+                    pass
+                if auto_reconnect:
+                    time.sleep(1)
+                else:
+                    return False
+            except TimeoutError:
+                if silence is False:
+                    showlog.error("TimeoutError. sql: %s" % sql)
+                    showlog.warning('try to reconnect in 1 second...')
+                else:
+                    pass
+                if auto_reconnect:
+                    time.sleep(1)
+                else:
+                    return False
             except Exception as ex:
-                showlog.warning("Oops! an error occurred, maybe query error. Exception: %s" % ex)
-                return
-        else:
-            showlog.info("Executing sql：%s ..." % sql)
-            try:
-                effect_rows = _query(
-                    sql=sql,
-                    parameter=parameter,
-                    cur=cur,
-                    con=con,
-                    operate=True,
-                    order_dict=order_dict
-                )
-                showlog.info("Executing sql success.")
-                return effect_rows
-            except Exception as ex:
-                showlog.warning("Oops! an error occurred, maybe query error. Exception: %s" % ex)
+                if silence is True:
+                    pass
+                else:
+                    showlog.warning("Oops! an error occurred, maybe query error. Exception: %s" % ex)
                 return
     except Exception as ex:
-        showlog.warning("Oops! an error occurred, maybe con2db error. Exception: %s" % ex)
+        if silence is True:
+            pass
+        else:
+            showlog.warning("Oops! an error occurred, maybe con2db error. Exception: %s" % ex)
         return
 
 
