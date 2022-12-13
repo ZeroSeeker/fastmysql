@@ -189,13 +189,11 @@ def _query(
         parameter: tuple = None,
         operate: bool = False,  # 是否为操作
         order_dict: bool = True,
-        silence: bool = silence_default,
-        auto_reconnect: bool = True,
-        reconnect_wait: int = 5
+        silence: bool = silence_default
 ):
     """
     查询结果以list(dict)形式输出
-    包含重试机制
+    [不包含重试机制，需要在外部执行重试]
     :param sql:
     :param cur:
     :param con:
@@ -203,45 +201,27 @@ def _query(
     :param operate: 为True的时候执行操作（执行commit），为False的时候执行查询数据（不执行commit）
     :param order_dict: 返回值是否组成有序dict
     :param silence:设置静默模式，为True表示静默，为False表示非静默
-    :param auto_reconnect: 自动重连
-    :param reconnect_wait: 重连等待时间，单位为秒，默认为5秒
     :return:
     """
-    while True:
-        try:
-            cur.execute(query=sql, args=parameter)
-            if operate is False:
-                # 只查询
-                index = cur.description
-                result = list()
-                for res in cur.fetchall():
-                    if order_dict is True:
-                        row = OrderedDict()
-                    else:
-                        row = dict()
-                    for i in range(len(index)):
-                        row[index[i][0]] = res[i]
-                    result.append(row)
-                return result
+    cur.execute(query=sql, args=parameter)
+    if operate is False:
+        # 只查询
+        index = cur.description
+        result = list()
+        for res in cur.fetchall():
+            if order_dict is True:
+                row = OrderedDict()
             else:
-                # 只操作
-                effect_rows = cur.rowcount
-                con.commit()
-                return effect_rows
-        except reconnect_errors:
-            if auto_reconnect:
-                if not silence:
-                    showlog.error(f'Oops, reconnect_errors, Trying to reconnect in {reconnect_wait} seconds ...')
-                time.sleep(reconnect_wait)
-            else:
-                return
-        except:
-            if auto_reconnect:
-                if not silence:
-                    showlog.error(f'Oops, Error, Trying to reconnect in {reconnect_wait} seconds ...')
-                time.sleep(reconnect_wait)
-            else:
-                return
+                row = dict()
+            for i in range(len(index)):
+                row[index[i][0]] = res[i]
+            result.append(row)
+        return result
+    else:
+        # 只操作
+        effect_rows = cur.rowcount
+        con.commit()
+        return effect_rows
 
 
 def query_table_all_data(
@@ -294,22 +274,35 @@ def query_table_all_data(
 
         if not silence:
             showlog.info(f"Executing sql：{sql} ...")
-        try:
-            res = _query(
-                cur=cur,
-                sql=sql,
-                order_dict=order_dict,
-                auto_reconnect=auto_reconnect,
-                reconnect_wait=reconnect_wait,
-                silence=silence
-            )
-            if not silence:
-                showlog.info("Executing sql success.")
-            return res
-        except Exception as ex:
-            if not silence:
-                showlog.warning(f"Oops! an error occurred, Exception: {ex}")
-            return
+        while True:
+            try:
+                res = _query(
+                    cur=cur,
+                    sql=sql,
+                    order_dict=order_dict,
+                    silence=silence
+                )
+                if not silence:
+                    showlog.info("Executing sql success.")
+                return res
+            except reconnect_errors:
+                if auto_reconnect:
+                    if not silence:
+                        showlog.error(f'Oops, reconnect_errors, Trying to reconnect in {reconnect_wait} seconds ...')
+                    time.sleep(reconnect_wait)
+                    con, cur = con2db(
+                        con_info=con_info,
+                        db_name=db_name,
+                        silence=silence,
+                        auto_reconnect=auto_reconnect,
+                        reconnect_wait=reconnect_wait
+                    )  # 已包含重试机制
+                else:
+                    return
+            except Exception as ex:
+                if not silence:
+                    showlog.warning(f"Oops! an error occurred, Exception: {ex}")
+                return
     except Exception as ex:
         if not silence:
             showlog.warning(f"Oops! an error occurred, Exception: {ex}")
@@ -359,23 +352,36 @@ def query_by_sql(
     try:
         if not silence:
             showlog.info(f"Executing sql：{sql} ...")
-        try:
-            res = _query(
-                cur=cur,
-                sql=sql,
-                parameter=parameter,
-                order_dict=order_dict,
-                auto_reconnect=auto_reconnect,
-                reconnect_wait=reconnect_wait,
-                silence=silence
-            )
-            if not silence:
-                showlog.info("Executing sql success.")
-            return res
-        except Exception as ex:
-            if not silence:
-                showlog.warning("Oops! an error occurred, Exception: %s" % ex)
-            return
+        while True:
+            try:
+                res = _query(
+                    cur=cur,
+                    sql=sql,
+                    parameter=parameter,
+                    order_dict=order_dict,
+                    silence=silence
+                )
+                if not silence:
+                    showlog.info("Executing sql success.")
+                return res
+            except reconnect_errors:
+                if auto_reconnect:
+                    if not silence:
+                        showlog.error(f'Oops, reconnect_errors, Trying to reconnect in {reconnect_wait} seconds ...')
+                    time.sleep(reconnect_wait)
+                    con, cur = con2db(
+                        con_info=con_info,
+                        db_name=db_name,
+                        silence=silence,
+                        auto_reconnect=auto_reconnect,
+                        reconnect_wait=reconnect_wait
+                    )  # 已包含重试机制
+                else:
+                    return
+            except Exception as ex:
+                if not silence:
+                    showlog.warning("Oops! an error occurred, Exception: %s" % ex)
+                return
     except Exception as ex:
         if not silence:
             showlog.warning("Oops! an error occurred, Exception: %s" % ex)
@@ -423,20 +429,34 @@ def do_by_sql(
     # ---------------- 固定设置 ----------------
     if not silence:
         showlog.info("Executing sql：%s ..." % sql)
-    effect_rows = _query(
-        sql=sql,
-        parameter=parameter,
-        cur=cur,
-        con=con,
-        operate=True,
-        order_dict=order_dict,
-        auto_reconnect=auto_reconnect,
-        reconnect_wait=reconnect_wait,
-        silence=silence
-    )
-    if not silence:
-        showlog.info("Executing sql success.")
-    return effect_rows
+    while True:
+        try:
+            effect_rows = _query(
+                sql=sql,
+                parameter=parameter,
+                cur=cur,
+                con=con,
+                operate=True,
+                order_dict=order_dict,
+                silence=silence
+            )
+            if not silence:
+                showlog.info("Executing sql success.")
+            return effect_rows
+        except reconnect_errors:
+            if auto_reconnect:
+                if not silence:
+                    showlog.error(f'Oops, reconnect_errors, Trying to reconnect in {reconnect_wait} seconds ...')
+                time.sleep(reconnect_wait)
+                con, cur = con2db(
+                    con_info=con_info,
+                    db_name=db_name,
+                    silence=silence,
+                    auto_reconnect=auto_reconnect,
+                    reconnect_wait=reconnect_wait
+                )  # 已包含重试机制
+            else:
+                return
 
 
 def data_bases(
@@ -473,26 +493,38 @@ def data_bases(
     sql = "SHOW DATABASES;"
     if not silence:
         showlog.info("Executing sql：%s ..." % sql)
-    try:
-        res = _query(
-            cur=cur,
-            sql=sql,
-            order_dict=order_dict,
-            auto_reconnect=auto_reconnect,
-            reconnect_wait=reconnect_wait,
-            silence=silence
-        )
-        if not silence:
-            showlog.info("Executing sql success.")
-        inner_db_list = list()
-        for each in res:
-            for k, v in each.items():
-                inner_db_list.append(v)
-        return inner_db_list
-    except Exception as ex:
-        if not silence:
-            showlog.warning("Oops! an error occurred, Exception: %s" % ex)
-        return
+    while True:
+        try:
+            res = _query(
+                cur=cur,
+                sql=sql,
+                order_dict=order_dict,
+                silence=silence
+            )
+            if not silence:
+                showlog.info("Executing sql success.")
+            inner_db_list = list()
+            for each in res:
+                for k, v in each.items():
+                    inner_db_list.append(v)
+            return inner_db_list
+        except reconnect_errors:
+            if auto_reconnect:
+                if not silence:
+                    showlog.error(f'Oops, reconnect_errors, Trying to reconnect in {reconnect_wait} seconds ...')
+                time.sleep(reconnect_wait)
+                con, cur = con2db(
+                    con_info=con_info,
+                    silence=silence,
+                    auto_reconnect=auto_reconnect,
+                    reconnect_wait=reconnect_wait
+                )  # 已包含重试机制
+            else:
+                return
+        except Exception as ex:
+            if not silence:
+                showlog.warning("Oops! an error occurred, Exception: %s" % ex)
+            return
 
 
 def tables(
@@ -532,26 +564,39 @@ def tables(
     sql = "SHOW TABLES;"
     if not silence:
         showlog.info("Executing sql：%s ..." % sql)
-    try:
-        res = _query(
-            cur=cur,
-            sql=sql,
-            order_dict=order_dict,
-            auto_reconnect=auto_reconnect,
-            reconnect_wait=reconnect_wait,
-            silence=silence
-        )
-        if not silence:
-            showlog.info("Executing sql success.")
-        table_list = list()
-        for each in res:
-            for k, v in each.items():
-                table_list.append(v)
-        return table_list
-    except Exception as ex:
-        if not silence:
-            showlog.warning("Oops! an error occurred, maybe query error. Exception: %s" % ex)
-        return
+    while True:
+        try:
+            res = _query(
+                cur=cur,
+                sql=sql,
+                order_dict=order_dict,
+                silence=silence
+            )
+            if not silence:
+                showlog.info("Executing sql success.")
+            table_list = list()
+            for each in res:
+                for k, v in each.items():
+                    table_list.append(v)
+            return table_list
+        except reconnect_errors:
+            if auto_reconnect:
+                if not silence:
+                    showlog.error(f'Oops, reconnect_errors, Trying to reconnect in {reconnect_wait} seconds ...')
+                time.sleep(reconnect_wait)
+                con, cur = con2db(
+                    con_info=con_info,
+                    db_name=db_name,
+                    silence=silence,
+                    auto_reconnect=auto_reconnect,
+                    reconnect_wait=reconnect_wait
+                )  # 已包含重试机制
+            else:
+                return
+        except Exception as ex:
+            if not silence:
+                showlog.warning("Oops! an error occurred, maybe query error. Exception: %s" % ex)
+            return
 
 
 def tb_info(
@@ -630,59 +675,70 @@ def column_list(
         reconnect_wait=reconnect_wait
     )  # 已包含重试机制
     # ---------------- 固定设置 ----------------
-    try:
-        sql1 = """
-        SELECT
-            `COLUMN_NAME` 
-        FROM
-            `information_schema`.`COLUMNS` 
-        WHERE
-            `TABLE_SCHEMA` = %s 
-            AND `TABLE_NAME` = %s;
-        """
-        all_col_dict = _query(
-            cur=cur,
-            sql=sql1,
-            parameter=(db_name, tb_name),
-            order_dict=order_dict,
-            auto_reconnect=auto_reconnect,
-            reconnect_wait=reconnect_wait,
-            silence=silence
-        )
-        all_col_list = list()
-        for each in all_col_dict:
-            all_col_list.append(each.get("COLUMN_NAME"))
-        sql2 = """
-        SELECT
-            `COLUMN_NAME` 
-        FROM
-            `information_schema`.`KEY_COLUMN_USAGE` 
-        WHERE
-            `TABLE_SCHEMA` = %s 
-            AND `TABLE_NAME` = %s
-        """
-        pk_col_dict = _query(
-            cur=cur,
-            sql=sql2,
-            parameter=(db_name, tb_name),
-            order_dict=order_dict,
-            auto_reconnect=auto_reconnect,
-            reconnect_wait=reconnect_wait,
-            silence=silence
-        )
-        pk_col_list = list()
-        for each in pk_col_dict:
-            pk_col_list.append(each.get("COLUMN_NAME"))
-        data_col_list = all_col_list.copy()
-        for each in pk_col_list:
-            try:
-                data_col_list.remove(each)
-            except:
-                pass
-        return all_col_list, pk_col_list, data_col_list
-    except Exception as ex:
-        showlog.warning("Oops! an error occurred in column_list, Exception: %s" % ex)
-        return
+    while True:
+        try:
+            sql1 = """
+            SELECT
+                `COLUMN_NAME` 
+            FROM
+                `information_schema`.`COLUMNS` 
+            WHERE
+                `TABLE_SCHEMA` = %s 
+                AND `TABLE_NAME` = %s;
+            """
+            all_col_dict = _query(
+                cur=cur,
+                sql=sql1,
+                parameter=(db_name, tb_name),
+                order_dict=order_dict,
+                silence=silence
+            )
+            all_col_list = list()
+            for each in all_col_dict:
+                all_col_list.append(each.get("COLUMN_NAME"))
+            sql2 = """
+            SELECT
+                `COLUMN_NAME` 
+            FROM
+                `information_schema`.`KEY_COLUMN_USAGE` 
+            WHERE
+                `TABLE_SCHEMA` = %s 
+                AND `TABLE_NAME` = %s
+            """
+            pk_col_dict = _query(
+                cur=cur,
+                sql=sql2,
+                parameter=(db_name, tb_name),
+                order_dict=order_dict,
+                silence=silence
+            )
+            pk_col_list = list()
+            for each in pk_col_dict:
+                pk_col_list.append(each.get("COLUMN_NAME"))
+            data_col_list = all_col_list.copy()
+            for each in pk_col_list:
+                try:
+                    data_col_list.remove(each)
+                except:
+                    pass
+            return all_col_list, pk_col_list, data_col_list
+        except reconnect_errors:
+            if auto_reconnect:
+                if not silence:
+                    showlog.error(f'Oops, reconnect_errors, Trying to reconnect in {reconnect_wait} seconds ...')
+                time.sleep(reconnect_wait)
+                con, cur = con2db(
+                    con_info=con_info,
+                    db_name=db_name,
+                    silence=silence,
+                    auto_reconnect=auto_reconnect,
+                    reconnect_wait=reconnect_wait
+                )  # 已包含重试机制
+            else:
+                return
+        except Exception as ex:
+            showlog.warning("Oops! an error occurred in column_list, Exception: %s" % ex)
+            return
 
 
 def query_to_pd(
@@ -926,6 +982,13 @@ def replace_into(
                             if not silence:
                                 showlog.error(f'Oops, reconnect_errors, Trying to reconnect in {reconnect_wait} seconds ...')
                             time.sleep(reconnect_wait)
+                            con, cur = con2db(
+                                con_info=con_info,
+                                db_name=db_name,
+                                silence=silence,
+                                auto_reconnect=auto_reconnect,
+                                reconnect_wait=reconnect_wait
+                            )  # 已包含重试机制
                         else:
                             return
                     except:
@@ -1042,6 +1105,13 @@ def insert(
                         if not silence:
                             showlog.error(f'Oops, reconnect_errors, Trying to reconnect in {reconnect_wait} seconds ...')
                         time.sleep(reconnect_wait)
+                        con, cur = con2db(
+                            con_info=con_info,
+                            db_name=db_name,
+                            silence=silence,
+                            auto_reconnect=auto_reconnect,
+                            reconnect_wait=reconnect_wait
+                        )  # 已包含重试机制
                     else:
                         return
                 except:
@@ -1154,6 +1224,13 @@ def update(
                         if not silence:
                             showlog.error(f'Oops, reconnect_errors, Trying to reconnect in {reconnect_wait} seconds ...')
                         time.sleep(reconnect_wait)
+                        con, cur = con2db(
+                            con_info=con_info,
+                            db_name=db_name,
+                            silence=silence,
+                            auto_reconnect=auto_reconnect,
+                            reconnect_wait=reconnect_wait
+                        )  # 已包含重试机制
                     else:
                         return
                 except:
