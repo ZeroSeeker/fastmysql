@@ -17,6 +17,7 @@ import copy
 import envx
 silence_default = True  # 默认静默参数为True
 env_file_name_default = 'mysql.env'  # 默认数据库连接环境文件名
+reconnect_errors = (ConnectionError, ConnectionAbortedError, TimeoutError)
 
 
 def make_con_info(
@@ -132,17 +133,10 @@ def con_mysql(
             if not silence:
                 showlog.info('ok! connection success.')
             return con, cur
-        except ConnectionError:
+        except reconnect_errors:
             if auto_reconnect:
                 if not silence:
-                    showlog.error(f'Oops, ConnectionError, Trying to reconnect in {reconnect_wait} seconds ...')
-                time.sleep(reconnect_wait)
-            else:
-                return
-        except TimeoutError:
-            if auto_reconnect:
-                if not silence:
-                    showlog.error(f'Oops, TimeoutError, Trying to reconnect in {reconnect_wait} seconds ...')
+                    showlog.error(f'Oops, reconnect_errors, Trying to reconnect in {reconnect_wait} seconds ...')
                 time.sleep(reconnect_wait)
             else:
                 return
@@ -234,17 +228,10 @@ def _query(
                 effect_rows = cur.rowcount
                 con.commit()
                 return effect_rows
-        except ConnectionError:
+        except reconnect_errors:
             if auto_reconnect:
                 if not silence:
-                    showlog.error(f'Oops, ConnectionError, Trying to reconnect in {reconnect_wait} seconds ...')
-                time.sleep(reconnect_wait)
-            else:
-                return
-        except TimeoutError:
-            if auto_reconnect:
-                if not silence:
-                    showlog.error(f'Oops, TimeoutError, Trying to reconnect in {reconnect_wait} seconds ...')
+                    showlog.error(f'Oops, reconnect_errors, Trying to reconnect in {reconnect_wait} seconds ...')
                 time.sleep(reconnect_wait)
             else:
                 return
@@ -934,17 +921,10 @@ def replace_into(
                         if not silence:
                             showlog.info("operate success.")
                         return True
-                    except ConnectionError:
+                    except reconnect_errors:
                         if auto_reconnect:
                             if not silence:
-                                showlog.error(f'Oops, ConnectionError, Trying to reconnect in {reconnect_wait} seconds ...')
-                            time.sleep(reconnect_wait)
-                        else:
-                            return
-                    except TimeoutError:
-                        if auto_reconnect:
-                            if not silence:
-                                showlog.error(f'Oops, TimeoutError, Trying to reconnect in {reconnect_wait} seconds ...')
+                                showlog.error(f'Oops, reconnect_errors, Trying to reconnect in {reconnect_wait} seconds ...')
                             time.sleep(reconnect_wait)
                         else:
                             return
@@ -1057,17 +1037,10 @@ def insert(
                     if not silence:
                         showlog.info("Insert success.")
                     return True
-                except ConnectionError:
+                except reconnect_errors:
                     if auto_reconnect:
                         if not silence:
-                            showlog.error(f'Oops, ConnectionError, Trying to reconnect in {reconnect_wait} seconds ...')
-                        time.sleep(reconnect_wait)
-                    else:
-                        return
-                except TimeoutError:
-                    if auto_reconnect:
-                        if not silence:
-                            showlog.error(f'Oops, TimeoutError, Trying to reconnect in {reconnect_wait} seconds ...')
+                            showlog.error(f'Oops, reconnect_errors, Trying to reconnect in {reconnect_wait} seconds ...')
                         time.sleep(reconnect_wait)
                     else:
                         return
@@ -1176,17 +1149,10 @@ def update(
                         # print(update_clause)
                         cur.execute(query=update_clause)
                     return con.commit()
-                except ConnectionError:
+                except reconnect_errors:
                     if auto_reconnect:
                         if not silence:
-                            showlog.error(f'Oops, ConnectionError, Trying to reconnect in {reconnect_wait} seconds ...')
-                        time.sleep(reconnect_wait)
-                    else:
-                        return
-                except TimeoutError:
-                    if auto_reconnect:
-                        if not silence:
-                            showlog.error(f'Oops, TimeoutError, Trying to reconnect in {reconnect_wait} seconds ...')
+                            showlog.error(f'Oops, reconnect_errors, Trying to reconnect in {reconnect_wait} seconds ...')
                         time.sleep(reconnect_wait)
                     else:
                         return
