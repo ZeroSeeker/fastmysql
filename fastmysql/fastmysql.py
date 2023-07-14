@@ -18,6 +18,8 @@ import envx
 silence_default = True  # 默认静默参数为True
 env_file_name_default = 'mysql.env'  # 默认数据库连接环境文件名
 reconnect_errors = (ConnectionError, ConnectionAbortedError, TimeoutError)
+default_charset = 'utf8'
+default_show_sql = False
 
 
 def make_con_info(
@@ -76,9 +78,7 @@ def make_con_info(
         if charset:
             con_info['charset'] = charset
         else:
-            if not silence:
-                showlog.warning('charset 未填写，将设置为默认值：utf8')
-            con_info['charset'] = 'utf8'
+            con_info['charset'] = default_charset
 
         return con_info
 
@@ -318,7 +318,8 @@ def query_by_sql(
         silence: bool = silence_default,
         order_dict: bool = True,
         auto_reconnect: bool = True,
-        reconnect_wait: int = 5
+        reconnect_wait: int = 5,
+        show_sql: bool = default_show_sql
 ):
     """
     按照sql查询
@@ -332,6 +333,7 @@ def query_by_sql(
     :param order_dict:
     :param auto_reconnect: 自动重连
     :param reconnect_wait: 重连等待时间，单位为秒，默认为5秒
+    :param show_sql: 是否显示sql，优先级低于silence
     按照sql查询
     查询结果以list(dict)形式输出
     """
@@ -351,7 +353,10 @@ def query_by_sql(
     # ---------------- 固定设置 ----------------
     try:
         if not silence:
-            showlog.info(f"Executing sql：{sql} ...")
+            if show_sql:
+                showlog.info(f"Executing sql：{sql} ...")
+            else:
+                showlog.info(f"Executing sql ...")
         while True:
             try:
                 res = _query(
@@ -397,7 +402,8 @@ def do_by_sql(
         silence: bool = silence_default,
         order_dict: bool = True,
         auto_reconnect: bool = True,
-        reconnect_wait: int = 5
+        reconnect_wait: int = 5,
+        show_sql: bool = default_show_sql
 ):
     """
     按照sql执行
@@ -412,6 +418,7 @@ def do_by_sql(
     :param order_dict:
     :param auto_reconnect: 自动重连
     :param reconnect_wait: 重连等待时间，单位为秒，默认为5秒
+    :param show_sql: 是否显示sql，优先级低于silence
     """
     # ---------------- 固定设置 ----------------
     if not con_info:
@@ -428,7 +435,10 @@ def do_by_sql(
     )  # 已包含重试机制
     # ---------------- 固定设置 ----------------
     if not silence:
-        showlog.info("Executing sql：%s ..." % sql)
+        if show_sql:
+            showlog.info(f"Executing sql：{sql} ...")
+        else:
+            showlog.info("Executing sql ...")
     while True:
         try:
             effect_rows = _query(
@@ -749,7 +759,8 @@ def query_to_pd(
         env_file_name: str = env_file_name_default,
         silence: bool = silence_default,
         auto_reconnect: bool = True,
-        reconnect_wait: int = 5
+        reconnect_wait: int = 5,
+        show_sql: bool = default_show_sql
 ):
     """
     针对数据量较大的情况，将数据存储到pd中
@@ -762,6 +773,7 @@ def query_to_pd(
     :param silence:
     :param auto_reconnect: 自动重连
     :param reconnect_wait: 重连等待时间，单位为秒，默认为5秒
+    :param show_sql: 是否显示sql，优先级低于silence
     """
     # ---------------- 固定设置 ----------------
     if not con_info:
