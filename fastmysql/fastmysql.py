@@ -122,7 +122,7 @@ def con_mysql(
                 passwd=password,
                 port=port,
                 charset=charset,
-                connect_timeout=reconnect_wait
+                # connect_timeout=reconnect_wait
             )
             if ssc is False:
                 cur = con.cursor()
