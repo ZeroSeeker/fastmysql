@@ -23,25 +23,25 @@ default_show_sql = False
 
 
 class FastMySQL:
-    # -------- 单例模式 --------
-    _instance = None
-
-    def __new__(cls, *args, **kwargs):
-        """
-        单例模式
-
-        FastMySQL 类的 _instance 类变量用于存储唯一的实例。
-        在 __new__ 方法中，首先检查 _instance 是否已经存在实例，
-        如果不存在，则使用 super() 调用父类的 __new__ 方法创建一个新实例，并将其赋值给 _instance 类变量。
-        如果已经存在实例，直接返回现有实例，确保只有一个实例存在。
-
-        使用单例模式可以有效地避免多次创建相同对象的开销，并确保全局只有一个对象实例，适用于需要共享状态或资源的场景。
-        """
-        if not cls._instance:
-            cls._instance = super(FastMySQL, cls).__new__(cls)
-            cls._instance.__init__(*args, **kwargs)
-        return cls._instance
-    # -------- 单例模式 --------
+    # # -------- 单例模式 --------
+    # _instance = None
+    #
+    # def __new__(cls, *args, **kwargs):
+    #     """
+    #     单例模式
+    #
+    #     FastMySQL 类的 _instance 类变量用于存储唯一的实例。
+    #     在 __new__ 方法中，首先检查 _instance 是否已经存在实例，
+    #     如果不存在，则使用 super() 调用父类的 __new__ 方法创建一个新实例，并将其赋值给 _instance 类变量。
+    #     如果已经存在实例，直接返回现有实例，确保只有一个实例存在。
+    #
+    #     使用单例模式可以有效地避免多次创建相同对象的开销，并确保全局只有一个对象实例，适用于需要共享状态或资源的场景。
+    #     """
+    #     if not cls._instance:
+    #         cls._instance = super(FastMySQL, cls).__new__(cls)
+    #         cls._instance.__init__(*args, **kwargs)
+    #     return cls._instance
+    # # -------- 单例模式 --------
 
     def __init__(
             self,
