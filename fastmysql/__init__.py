@@ -7,3 +7,4 @@
 @ Gitee : https://gitee.com/ZeroSeeker
 """
 from .fastmysql import *
+from .fastmysql_test import *
