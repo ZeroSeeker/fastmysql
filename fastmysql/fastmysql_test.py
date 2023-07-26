@@ -150,7 +150,8 @@ class FastMySQL:
             sql: str = None,
             sql_list: list = None,
             args=None,
-            executemany: bool = False
+            executemany: bool = False,
+            database_name: str = None
     ):
         """
         查询结果以list(dict)形式输出
@@ -159,6 +160,7 @@ class FastMySQL:
         :param sql_list:
         :param args: 参数化查询语句避免SQL注入
         :param executemany: 是否批量执行
+        :param database_name: 指定数据库名
         :return: {"data": [], "affected_rows": 0}
         """
         retries = 0
@@ -168,6 +170,11 @@ class FastMySQL:
             connection = self.POOL.connection()  # 从连接池中获取连接对象
             try:
                 with connection.cursor() as cursor:
+                    if database_name:
+                        cursor.execute(f"USE {database_name};")
+                    else:
+                        pass
+
                     if executemany:
                         if sql:
                             cursor.executemany(
