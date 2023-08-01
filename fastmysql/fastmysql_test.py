@@ -51,7 +51,9 @@ class FastMySQL:
             auto_reconnect: bool = True,
             reconnect_wait: int = 5,
             max_connections: int = 10,
-            timeout: int = 120
+            max_shared: int = 10,
+            max_cached: int = 5,
+            min_cached: int = 2
     ):
         self.env_file_name = env_file_name
         self.silence = silence
@@ -75,8 +77,9 @@ class FastMySQL:
         self.POOL = PooledDB(
             creator=pymysql,  # 使用pymysql作为连接器
             maxconnections=max_connections,  # 连接池允许的最大连接数
-            # maxcached=10,
-            # maxshared=10,
+            maxcached=max_cached,  # 参数用于指定连接池中允许缓存的最大空闲连接数。当连接池中存在多余的连接，并且超过了maxcached限制时，多余的空闲连接将会被关闭和释放，以避免连接池中连接数过多。
+            mincached=min_cached,
+            maxshared=max_shared,  # 参数用于指定在连接池中可以共享的最大连接数。当多个线程或进程同时请求数据库连接时，如果连接池中存在空闲的连接且未达到maxshared限制，那么这些请求将共享同一个连接，从而减少了连接的创建和销毁开销，提高了性能
             blocking=True,  # 如果连接池为空，getconn方法将会阻塞等待
             setsession=[],
             host=self.host,
@@ -87,8 +90,7 @@ class FastMySQL:
             autocommit=True,  # 自动提交事务
             cursorclass=pymysql.cursors.DictCursor,  # 返回字典形式的查询结果
             maxusage=100,  # 每个连接的最大使用次数，表示每个连接最多被使用100次。当一个连接被使用次数达到100时，连接会自动关闭，并在以后的请求中重新创建一个新的连接。这样，当连接由于长时间使用而失效时，会自动重连，保证连接的可靠性。
-            connect_timeout=10,  # 连接数据库的最大超时时间，单位为秒;这表示连接数据库的最大超时时间为10秒。如果在连接数据库时，超过10秒仍然未成功建立连接，连接池会自动重试连接。
-            timeout=timeout  # sql执行超时时间
+            connect_timeout=10  # 连接数据库的最大超时时间，单位为秒;这表示连接数据库的最大超时时间为10秒。如果在连接数据库时，超过10秒仍然未成功建立连接，连接池会自动重试连接。
         )
 
     def make_con_info(
