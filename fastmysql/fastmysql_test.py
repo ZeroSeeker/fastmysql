@@ -563,7 +563,8 @@ class FastMySQL:
             data_dict_list: list,
             db_name: str,
             tb_name: str,
-            replace: bool = False
+            replace: bool = False,
+            insert_ignore: bool = False
     ):
         """
         此模块的功能是插入数据
@@ -573,6 +574,7 @@ class FastMySQL:
         :param db_name:
         :param tb_name:
         :param replace: 是否更新
+        :param insert_ignore: 在insert时是否添加ignore参数忽略错误，例如主键重复的记录不会被插入
         """
         if not data_dict_list:
             return 0
@@ -580,7 +582,10 @@ class FastMySQL:
             if replace:
                 sql_head = 'REPLACE'
             else:
-                sql_head = 'INSERT'
+                if insert_ignore:
+                    sql_head = 'INSERT IGNORE'
+                else:
+                    sql_head = 'INSERT'
             query_sql, query_args = self.make_query_data(
                 data_dict_list=data_dict_list,
                 db_name=db_name,

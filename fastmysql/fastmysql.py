@@ -1028,7 +1028,8 @@ def insert(
         replace_space_to_none: bool = True,
         silence: bool = silence_default,
         auto_reconnect: bool = True,
-        reconnect_wait: int = 5
+        reconnect_wait: int = 5,
+        ignore: bool = False
 ):
     """
     此模块的功能是插入和自动更新
@@ -1042,6 +1043,7 @@ def insert(
     :param silence:
     :param auto_reconnect: 自动重连
     :param reconnect_wait: 重连等待时间，单位为秒，默认为5秒
+    :param ignore: 忽略错误，例如主键重复的记录不会被插入
     """
     # ---------------- 固定设置 ----------------
     if not con_info:
@@ -1086,7 +1088,10 @@ def insert(
                 insert_data_arg_list.append("%s")
             insert_data_tuple = ",".join(insert_data_arg_list)
             # 生成插入语句模板
-            insert_clause = f'INSERT INTO `{db_name}`.`{tb_name}`(`{insert_clause_tuple}`) VALUES({insert_data_tuple})'
+            if ignore:
+                insert_clause = f'INSERT IGNORE INTO `{db_name}`.`{tb_name}`(`{insert_clause_tuple}`) VALUES({insert_data_tuple})'
+            else:
+                insert_clause = f'INSERT INTO `{db_name}`.`{tb_name}`(`{insert_clause_tuple}`) VALUES({insert_data_tuple})'
 
             # 生成插入数据tuple
             insert_data_list = list()
