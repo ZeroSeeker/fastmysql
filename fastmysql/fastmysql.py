@@ -15,6 +15,9 @@ import pymysql
 import time
 import copy
 import envx
+
+import fastmysql
+
 silence_default = True  # 默认静默参数为True
 env_file_name_default = 'mysql.env'  # 默认数据库连接环境文件名
 reconnect_errors = (ConnectionError, ConnectionAbortedError, TimeoutError)
@@ -1306,3 +1309,107 @@ def show_create_table(
         return res[0]['Create Table']
     else:
         return
+
+
+def save_as_sql(
+        db_name: str,
+        tb_name: str,
+        con_info: dict = None,  # 若指定，将优先使用
+        env_file_name: str = env_file_name_default,
+        silence: bool = silence_default,
+        auto_reconnect: bool = True,
+        reconnect_wait: int = 5
+):
+    """
+    类似于Navicat的转储sql功能
+    """
+    import datetime
+    # ---------------- 固定设置 ----------------
+    if not con_info:
+        con_info = make_con_info(
+            env_file_name=env_file_name,
+            silence=silence
+        )
+    # ---------------- 固定设置 ----------------
+    SourceServerVersion = fastmysql.query_by_sql(
+        sql='SELECT @@version;',
+        env_file_name=env_file_name,
+        silence=silence
+    )[0]['@@version']  # 获取源服务器版本
+
+    SourceHost = f"{con_info.get('host')}:{con_info.get('port')}"
+
+    charset = fastmysql.query_by_sql(
+        sql=f"SELECT `DEFAULT_CHARACTER_SET_NAME` FROM `information_schema`.`SCHEMATA` WHERE `schema_name` = '{db_name}';",
+        env_file_name=env_file_name,
+        silence=silence
+    )[0]['DEFAULT_CHARACTER_SET_NAME']  # 获取数据库的charset
+
+    tb_create_sql = fastmysql.show_create_table(
+        db_name=db_name,
+        tb_name=tb_name,
+        env_file_name=env_file_name,
+        silence=silence
+    )
+
+    data = fastmysql.query_table_all_data(
+        db_name=db_name,
+        tb_name=tb_name,
+        env_file_name=env_file_name,
+        silence=silence
+    )
+    if data:
+        insert_sql_list = list()
+        for each_data in data:
+            key_list = list()
+            value_list = list()
+            for data_key, data_value in each_data.items():
+                key_list.append(data_key)
+                value_list.append(str(data_value))
+            key_str = "`,`".join(key_list)
+            value_str = "','".join(value_list)
+            each_insert_sql = f"INSERT INTO `{tb_name}` (`{key_str}`) VALUES ('{value_str}');"
+            insert_sql_list.append(each_insert_sql)
+        insert_sql_str = '\n'.join(insert_sql_list)
+    else:
+        insert_sql_str = ''
+
+    content = f"""
+/*
+ fastmysql Data Transfer
+ auther: ZeroSeeker
+ email: ZeroSeeker@foxmail.com
+
+ Source Server         : /
+ Source Server Type    : MySQL
+ Source Server Version : {SourceServerVersion}
+ Source Host           : {SourceHost}
+ Source Schema         : {db_name}
+
+ Target Server Type    : MySQL
+ Target Server Version : {SourceServerVersion}
+ File Encoding         : 65001
+
+ Date: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+*/
+
+SET NAMES {charset};
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- ----------------------------
+-- Table structure for {tb_name}
+-- ----------------------------
+DROP TABLE IF EXISTS `{tb_name}`;
+{tb_create_sql};
+
+-- ----------------------------
+-- Records of {tb_name}
+-- ----------------------------
+BEGIN;
+{insert_sql_str}
+COMMIT;
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+    """
+    return content
