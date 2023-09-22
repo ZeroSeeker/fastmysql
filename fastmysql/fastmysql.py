@@ -1324,6 +1324,7 @@ def save_as_sql(
     类似于Navicat的转储sql功能
     """
     import datetime
+    import decimal
     # ---------------- 固定设置 ----------------
     if not con_info:
         con_info = make_con_info(
@@ -1362,13 +1363,27 @@ def save_as_sql(
         insert_sql_list = list()
         for each_data in data:
             key_list = list()
-            value_list = list()
+            # value_list = list()
+            value_str = ''
             for data_key, data_value in each_data.items():
                 key_list.append(data_key)
-                value_list.append(str(data_value))
+                if data_value:
+                    if isinstance(data_value, int):
+                        value_str += f"{data_value},"
+                    elif isinstance(data_value, decimal.Decimal):
+                        value_str += f"{data_value},"
+                    elif isinstance(data_value, float):
+                        value_str += f"{data_value},"
+                    else:
+                        value_str += f"'{str(data_value)}',"
+                    # value_list.append(str(data_value))
+                else:
+                    value_str += f"NULL,"
+                    # value_list.append(str(data_value))
             key_str = "`,`".join(key_list)
-            value_str = "','".join(value_list)
-            each_insert_sql = f"INSERT INTO `{tb_name}` (`{key_str}`) VALUES ('{value_str}');"
+            # value_str = "','".join(value_list)
+            value_str = value_str[:-1]
+            each_insert_sql = f"INSERT INTO `{tb_name}` (`{key_str}`) VALUES ({value_str});"
             insert_sql_list.append(each_insert_sql)
         insert_sql_str = '\n'.join(insert_sql_list)
     else:
