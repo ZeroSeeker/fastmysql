@@ -473,8 +473,7 @@ class FastMySQL:
             data_column_list = column_info.get('data_column_list')
 
             data_dict_list_temp = copy.deepcopy(data_dict_list)  # 深度拷贝，不更改源数据
-            if sql_head.lower() in ['insert', 'replace']:
-
+            if ('replace' in sql_head.lower()) or ('insert' in sql_head.lower()):
                 # 按照目标表的结构格式化data_dict_list，去除额外列的数据，只保留预设列的数据
                 # step1: 清洗数据
                 operate_param_set = set()
@@ -515,7 +514,7 @@ class FastMySQL:
                                 each_data_list.append(temp_data)
                     data_list.append(tuple(each_data_list))  # 转换为tuple确保不变
                 query_args = list(set(data_list))  # set去重
-            elif sql_head.lower() in ['update']:
+            elif 'update' in sql_head.lower():
                 update_clause_list = list()
                 for each_data_dict in data_dict_list_temp:  # 遍历数据list里的所有dict
                     set_clause_list = list()  # set语句列表
