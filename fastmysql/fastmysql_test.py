@@ -50,7 +50,7 @@ class FastMySQL:
             ssc: bool = False,
             auto_reconnect: bool = True,
             reconnect_wait: int = 5,
-            max_connections: int = 10,
+            max_connections: int = 1,
             max_shared: int = 10,
             max_cached: int = 5,
             min_cached: int = 2
