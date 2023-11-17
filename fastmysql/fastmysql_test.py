@@ -20,6 +20,12 @@ env_file_name_default = 'mysql.env'  # 默认数据库连接环境文件名
 reconnect_errors = (ConnectionError, ConnectionAbortedError, TimeoutError)
 default_charset = 'utf8'
 default_show_sql = False
+"""
+目前存在部分特殊字符集无法正确保存问题
+【待解决问题】
+DBUtils下的PersistentDB/PoolDB
+https://zhuanlan.zhihu.com/p/174762034
+"""
 
 
 class FastMySQL:
@@ -51,7 +57,7 @@ class FastMySQL:
             auto_reconnect: bool = True,
             reconnect_wait: int = 5,
             max_connections: int = 1,
-            max_shared: int = 10,
+            max_shared: int = 0,
             max_cached: int = 5,
             min_cached: int = 2
     ):
