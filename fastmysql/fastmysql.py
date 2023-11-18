@@ -23,6 +23,7 @@ env_file_name_default = 'mysql.env'  # 默认数据库连接环境文件名
 reconnect_errors = (ConnectionError, ConnectionAbortedError, TimeoutError)
 default_charset = 'utf8'
 default_show_sql = False
+default_reconnect_wait = 60
 
 
 def make_con_info(
@@ -96,7 +97,7 @@ def con_mysql(
         ssc: bool = False,
         silence: bool = silence_default,
         auto_reconnect: bool = True,
-        reconnect_wait: int = 5
+        reconnect_wait: int = default_reconnect_wait
 ):
     """
     执行连接数据库
@@ -125,7 +126,7 @@ def con_mysql(
                 passwd=password,
                 port=port,
                 charset=charset,
-                # connect_timeout=reconnect_wait
+                connect_timeout=reconnect_wait
             )
             if ssc is False:
                 cur = con.cursor()
@@ -159,7 +160,7 @@ def con2db(
         silence: bool = silence_default,
         ssc: bool = False,
         auto_reconnect: bool = True,
-        reconnect_wait: int = 5
+        reconnect_wait: int = default_reconnect_wait
 ):
     """
     对连接数据库的方法再次优化，此处可以定义所有数据库的连接
@@ -238,7 +239,7 @@ def query_table_all_data(
         silence: bool = silence_default,
         order_dict: bool = True,
         auto_reconnect: bool = True,
-        reconnect_wait: int = 5
+        reconnect_wait: int = default_reconnect_wait
 ):
     """
     获取表所有数据
@@ -322,7 +323,7 @@ def query_by_sql(
         silence: bool = silence_default,
         order_dict: bool = True,
         auto_reconnect: bool = True,
-        reconnect_wait: int = 5,
+        reconnect_wait: int = default_reconnect_wait,
         show_sql: bool = default_show_sql
 ):
     """
@@ -406,7 +407,7 @@ def do_by_sql(
         silence: bool = silence_default,
         order_dict: bool = True,
         auto_reconnect: bool = True,
-        reconnect_wait: int = 5,
+        reconnect_wait: int = default_reconnect_wait,
         show_sql: bool = default_show_sql
 ):
     """
@@ -479,7 +480,7 @@ def data_bases(
         silence: bool = silence_default,
         order_dict: bool = True,
         auto_reconnect: bool = True,
-        reconnect_wait: int = 5
+        reconnect_wait: int = default_reconnect_wait
 ):
     """
     获取MySQL的连接权限范围内的所有db列表
@@ -548,7 +549,7 @@ def tables(
         silence: bool = silence_default,
         order_dict: bool = True,
         auto_reconnect: bool = True,
-        reconnect_wait: int = 5
+        reconnect_wait: int = default_reconnect_wait
 ):
     """
     获取所有表，若不指定db_name，将获取所有
@@ -620,7 +621,7 @@ def tb_info(
         env_file_name: str = env_file_name_default,
         silence: bool = silence_default,
         auto_reconnect: bool = True,
-        reconnect_wait: int = 5
+        reconnect_wait: int = default_reconnect_wait
 ):
     """
     输出表信息，其中：
@@ -662,7 +663,7 @@ def column_list(
         silence: bool = silence_default,
         order_dict: bool = True,
         auto_reconnect: bool = True,
-        reconnect_wait: int = 5
+        reconnect_wait: int = default_reconnect_wait
 ):
     """
     【包含重试机制】
@@ -763,7 +764,7 @@ def query_to_pd(
         env_file_name: str = env_file_name_default,
         silence: bool = silence_default,
         auto_reconnect: bool = True,
-        reconnect_wait: int = 5,
+        reconnect_wait: int = default_reconnect_wait,
         show_sql: bool = default_show_sql
 ):
     """
@@ -820,7 +821,7 @@ def information_schema(
         env_file_name: str = env_file_name_default,
         silence: bool = silence_default,
         auto_reconnect: bool = True,
-        reconnect_wait: int = 5
+        reconnect_wait: int = default_reconnect_wait
 ):
     """
     输出表信息，其中：
@@ -926,7 +927,7 @@ def replace_into(
         pk_col_list: list = None,
         silence: bool = silence_default,
         auto_reconnect: bool = True,
-        reconnect_wait: int = 5
+        reconnect_wait: int = default_reconnect_wait
 ):
     """
     插入和自动更新，注意，这里的更新是先对原来的数据删除，再插入，不适用于局部更新！
@@ -1031,7 +1032,7 @@ def insert(
         replace_space_to_none: bool = True,
         silence: bool = silence_default,
         auto_reconnect: bool = True,
-        reconnect_wait: int = 5,
+        reconnect_wait: int = default_reconnect_wait,
         ignore: bool = False
 ):
     """
@@ -1158,7 +1159,7 @@ def update(
         env_file_name: str = env_file_name_default,
         silence: bool = silence_default,
         auto_reconnect: bool = True,
-        reconnect_wait: int = 5
+        reconnect_wait: int = default_reconnect_wait
 ):
     """
     针对MySQL的数据批量更新方法，不考虑data_dict_list为空或者无数据的情况，仅仅能批量更新，默认where条件是表格的主键，且空值不参与
@@ -1275,7 +1276,7 @@ def show_create_table(
         env_file_name: str = env_file_name_default,
         silence: bool = silence_default,
         auto_reconnect: bool = True,
-        reconnect_wait: int = 5
+        reconnect_wait: int = default_reconnect_wait
 ):
     """
     获取建表语句
@@ -1318,7 +1319,7 @@ def save_as_sql(
         env_file_name: str = env_file_name_default,
         silence: bool = silence_default,
         auto_reconnect: bool = True,
-        reconnect_wait: int = 5
+        reconnect_wait: int = default_reconnect_wait
 ):
     """
     类似于Navicat的转储sql功能
