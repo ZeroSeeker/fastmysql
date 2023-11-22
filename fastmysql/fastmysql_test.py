@@ -457,7 +457,8 @@ class FastMySQL:
             db_name: str,
             tb_name: str,
             replace_space_to_none: bool = True,  # 自动将空值null改为None
-            sql_head: str = 'REPLACE'
+            sql_head: str = 'REPLACE',
+            int64_to_int: bool = True
     ):
         """
         功能性模块：格式化数据
@@ -514,8 +515,8 @@ class FastMySQL:
                             else:
                                 each_data_list.append("")
                         else:
-                            if isinstance(temp_data, np.int64) is True:
-                                each_data_list.append(str(temp_data))  # 将Int64转换为str
+                            if isinstance(temp_data, np.int64) and int64_to_int:
+                                each_data_list.append(int(temp_data))  # 将Int64转换为int
                             else:
                                 each_data_list.append(temp_data)
                     data_list.append(tuple(each_data_list))  # 转换为tuple确保不变
