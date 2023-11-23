@@ -28,6 +28,17 @@ https://zhuanlan.zhihu.com/p/174762034
 """
 
 
+# 装饰器，计算插入50000条数据需要的时间
+def timer(func):
+    def decor(*args):
+        start_time = time.time()
+        func(*args)
+        end_time = time.time()
+        d_time = end_time - start_time
+        showlog.info("the running time is : ", d_time)
+    return decor
+
+
 class FastMySQL:
     # # -------- 单例模式 --------
     # _instance = None
@@ -467,6 +478,7 @@ class FastMySQL:
         :param tb_name:
         :param replace_space_to_none:
         :param sql_head:
+        :param int64_to_int:
         """
         query_sql = None
         query_args = None
@@ -500,7 +512,7 @@ class FastMySQL:
                     insert_data_arg_list.append("%s")
                 data_tuple = ",".join(insert_data_arg_list)
                 # 生成插入语句模板
-                query_sql = f'{sql_head} INTO `{db_name}`.`{tb_name}`(`{operate_clause_tuple}`) VALUES({data_tuple})'
+                query_sql = f'{sql_head} INTO `{db_name}`.`{tb_name}`(`{operate_clause_tuple}`) VALUES ({data_tuple})'
 
                 # step3:
                 # 生成插入数据tuple
@@ -564,6 +576,7 @@ class FastMySQL:
             pass
         return query_sql, query_args
 
+    @timer
     def insert(
             self,
             data_dict_list: list,
