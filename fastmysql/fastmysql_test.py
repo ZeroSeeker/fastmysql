@@ -525,8 +525,7 @@ class FastMySQL:
                                 each_data_list.append(str(temp_data))  # 将decimal转换为str
                             else:
                                 each_data_list.append(temp_data)
-                    # data_list.append(tuple(each_data_list))  # 转换为tuple确保不变
-                    data_list.append(each_data_list)  # 转换为tuple确保不变
+                    data_list.append(tuple(each_data_list))  # 转换为tuple确保不变
                 query_args = list(set(data_list))  # set去重
             elif 'update' in sql_head.lower():
                 update_clause_list = list()
