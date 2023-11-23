@@ -6,6 +6,8 @@
 @ GitHub : https://github.com/ZeroSeeker
 @ Gitee : https://gitee.com/ZeroSeeker
 """
+import decimal
+
 from dbutils.pooled_db import PooledDB
 from tqdm import tqdm
 import pandas as pd
@@ -458,7 +460,8 @@ class FastMySQL:
             tb_name: str,
             replace_space_to_none: bool = True,  # 自动将空值null改为None
             sql_head: str = 'REPLACE',
-            int64_to_int: bool = True
+            int64_to_int: bool = True,
+            decimal2str: bool = True
     ):
         """
         功能性模块：格式化数据
@@ -518,6 +521,8 @@ class FastMySQL:
                         else:
                             if isinstance(temp_data, np.int64) and int64_to_int:
                                 each_data_list.append(int(temp_data))  # 将Int64转换为int
+                            elif isinstance(temp_data, decimal.Decimal) and decimal2str:
+                                each_data_list.append(str(temp_data))  # 将decimal转换为str
                             else:
                                 each_data_list.append(temp_data)
                     data_list.append(tuple(each_data_list))  # 转换为tuple确保不变
