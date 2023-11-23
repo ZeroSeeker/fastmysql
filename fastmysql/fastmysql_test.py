@@ -28,17 +28,6 @@ https://zhuanlan.zhihu.com/p/174762034
 """
 
 
-# 装饰器，计算插入50000条数据需要的时间
-def timer(func):
-    def decor(*args):
-        start_time = time.time()
-        func(*args)
-        end_time = time.time()
-        d_time = end_time - start_time
-        showlog.info("the running time is : ", d_time)
-    return decor
-
-
 class FastMySQL:
     # # -------- 单例模式 --------
     # _instance = None
@@ -576,7 +565,6 @@ class FastMySQL:
             pass
         return query_sql, query_args
 
-    @timer
     def insert(
             self,
             data_dict_list: list,
