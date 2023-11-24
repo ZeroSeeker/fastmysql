@@ -6,6 +6,7 @@
 @ GitHub : https://github.com/ZeroSeeker
 @ Gitee : https://gitee.com/ZeroSeeker
 """
+import datetime
 from collections import OrderedDict
 from tqdm import tqdm
 import pandas as pd
@@ -1102,13 +1103,17 @@ def insert(
             for each_data_dict in data_dict_list:
                 each_insert_data_list = list()
                 for each_data_key in insert_param_list:
-                    if each_data_dict.get(each_data_key) == "":
+                    each_data_value = each_data_dict.get(each_data_key)
+                    if each_data_value == "":
                         if replace_space_to_none is True:
                             each_insert_data_list.append(None)
                         else:
                             each_insert_data_list.append("")
+                    elif isinstance(each_data_value, datetime.date):
+                        # 将date转化为字符串插入
+                        each_insert_data_list.append(each_data_value.strftime('%Y-%m-%d'))
                     else:
-                        each_insert_data_list.append(each_data_dict.get(each_data_key))
+                        each_insert_data_list.append(each_data_value)
                 insert_data_list.append(tuple(each_insert_data_list))
 
             insert_data_list = set(insert_data_list)  # set去重
