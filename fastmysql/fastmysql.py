@@ -25,6 +25,7 @@ reconnect_errors = (ConnectionError, ConnectionAbortedError, TimeoutError)
 default_charset = 'utf8'
 default_show_sql = False
 default_reconnect_wait = 60
+default_connect_timeout = 60 * 10
 
 
 def make_con_info(
@@ -98,7 +99,8 @@ def con_mysql(
         ssc: bool = False,
         silence: bool = silence_default,
         auto_reconnect: bool = True,
-        reconnect_wait: int = default_reconnect_wait
+        reconnect_wait: int = default_reconnect_wait,
+        connect_timeout: int = default_connect_timeout
 ):
     """
     执行连接数据库
@@ -114,6 +116,7 @@ def con_mysql(
     :param silence: 静默模式
     :param auto_reconnect: 自动重连
     :param reconnect_wait: 重连等待时间，单位为秒，默认为5秒
+    :param connect_timeout: 最大查询时间
     :return:(con, cur)
     """
     while True:
@@ -127,7 +130,7 @@ def con_mysql(
                 passwd=password,
                 port=port,
                 charset=charset,
-                connect_timeout=reconnect_wait
+                connect_timeout=connect_timeout
             )
             if ssc is False:
                 cur = con.cursor()
