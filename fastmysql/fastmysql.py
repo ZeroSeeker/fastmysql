@@ -1035,7 +1035,8 @@ def insert(
         auto_reconnect: bool = True,
         reconnect_wait: int = default_reconnect_wait,
         ignore: bool = False,
-        date2str: bool = True
+        date2str: bool = True,
+        date2str_f: str = '%Y-%m-%d'
 ):
     """
     此模块的功能是插入和自动更新
@@ -1112,7 +1113,7 @@ def insert(
                             each_insert_data_list.append("")
                     elif isinstance(each_data_value, datetime.date) and date2str:
                         # 将date转化为字符串插入
-                        each_insert_data_list.append(each_data_value.strftime('%Y-%m-%d'))
+                        each_insert_data_list.append(each_data_value.strftime(date2str_f))
                     else:
                         each_insert_data_list.append(each_data_value)
                 insert_data_list.append(tuple(each_insert_data_list))
