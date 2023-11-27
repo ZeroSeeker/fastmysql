@@ -1132,6 +1132,22 @@ def insert(
                     if not silence:
                         showlog.info("Insert success.")
                     return True
+                except pymysql.err.ProgrammingError:
+                    # 这里对这种错误单独处理，可能是网络不稳定导致的，当然也可能是语句本身的问题
+                    this_reconnect_wait = 1
+                    if auto_reconnect:
+                        if not silence:
+                            showlog.error(f'Oops, pymysql.err.ProgrammingError, Trying to reconnect in {this_reconnect_wait} seconds ...')
+                        time.sleep(this_reconnect_wait)
+                        con, cur = con2db(
+                            con_info=con_info,
+                            db_name=db_name,
+                            silence=silence,
+                            auto_reconnect=auto_reconnect,
+                            reconnect_wait=this_reconnect_wait
+                        )  # 已包含重试机制
+                    else:
+                        return
                 except reconnect_errors:
                     if auto_reconnect:
                         if not silence:
