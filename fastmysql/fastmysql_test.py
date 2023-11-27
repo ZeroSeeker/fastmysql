@@ -19,7 +19,7 @@ import copy
 import envx
 silence_default = True  # 默认静默参数为True
 env_file_name_default = 'mysql.env'  # 默认数据库连接环境文件名
-reconnect_errors = (ConnectionError, ConnectionAbortedError, TimeoutError)
+reconnect_errors = (ConnectionError, ConnectionAbortedError, TimeoutError, pymysql.err.ProgrammingError)
 default_charset = 'utf8'
 default_show_sql = False
 """
