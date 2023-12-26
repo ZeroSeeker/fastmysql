@@ -191,6 +191,14 @@ def con2db(
     )
 
 
+def close_conn(conn, cursor):
+    # 关闭连接
+    if cursor:
+        cursor.close()
+    if conn:
+        conn.close()
+
+
 def _query(
         sql: str,
         cur,
@@ -291,6 +299,7 @@ def query_table_all_data(
                     order_dict=order_dict,
                     silence=silence
                 )
+                close_conn(conn=con, cursor=cur)  # 关闭连接
                 if not silence:
                     showlog.info("Executing sql success.")
                 return res
@@ -375,6 +384,7 @@ def query_by_sql(
                     order_dict=order_dict,
                     silence=silence
                 )
+                close_conn(conn=con, cursor=cur)  # 关闭连接
                 if not silence:
                     showlog.info("Executing sql success.")
                 return res
@@ -459,6 +469,7 @@ def do_by_sql(
                 order_dict=order_dict,
                 silence=silence
             )
+            close_conn(conn=con, cursor=cur)  # 关闭连接
             if not silence:
                 showlog.info("Executing sql success.")
             return effect_rows
@@ -520,6 +531,7 @@ def data_bases(
                 order_dict=order_dict,
                 silence=silence
             )
+            close_conn(conn=con, cursor=cur)  # 关闭连接
             if not silence:
                 showlog.info("Executing sql success.")
             inner_db_list = list()
@@ -591,6 +603,7 @@ def tables(
                 order_dict=order_dict,
                 silence=silence
             )
+            close_conn(conn=con, cursor=cur)  # 关闭连接
             if not silence:
                 showlog.info("Executing sql success.")
             table_list = list()
@@ -740,6 +753,7 @@ def column_list(
                     data_col_list.remove(each)
                 except:
                     pass
+            close_conn(conn=con, cursor=cur)  # 关闭连接
             return all_col_list, pk_col_list, data_col_list
         except reconnect_errors:
             if auto_reconnect:
@@ -812,6 +826,7 @@ def query_to_pd(
             for i in range(len(index)):
                 row[index[i][0]] = res[i]
             result.append(row)
+        close_conn(conn=con, cursor=cur)  # 关闭连接
         return pd.DataFrame(result)
     except:
         showlog.warning("Oops! an error occurred in query, sql: %s" % sql)
@@ -997,6 +1012,7 @@ def replace_into(
                         con.commit()
                         if not silence:
                             showlog.info("operate success.")
+                        close_conn(conn=con, cursor=cur)  # 关闭连接
                         return True
                     except reconnect_errors:
                         if auto_reconnect:
@@ -1131,6 +1147,7 @@ def insert(
                     con.commit()
                     if not silence:
                         showlog.info("Insert success.")
+                    close_conn(conn=con, cursor=cur)  # 关闭连接
                     return True
                 except pymysql.err.ProgrammingError:
                     # 这里对这种错误单独处理，可能是网络不稳定导致的，当然也可能是语句本身的问题
@@ -1266,7 +1283,9 @@ def update(
                         update_clause = f'UPDATE `{db_name}`.`{tb_name}` SET {set_string} WHERE {where_string}'
                         # print(update_clause)
                         cur.execute(query=update_clause)
-                    return con.commit()
+                    commit_res = con.commit()
+                    close_conn(conn=con, cursor=cur)  # 关闭连接
+                    return commit_res
                 except reconnect_errors:
                     if auto_reconnect:
                         if not silence:
@@ -1455,3 +1474,67 @@ SET FOREIGN_KEY_CHECKS = 1;
 
     """
     return content
+
+
+def db_exist(
+        db_name: str,
+        env_file_name: str = env_file_name_default,
+        silence: bool = silence_default,
+):
+    """
+    判断数据库是否存在
+    """
+    check_sql = f"select 1 from `information_schema`.`schemata`  where schema_name='{db_name}';"
+    check_res = query_by_sql(
+        sql=check_sql,
+        db_name='information_schema',
+        env_file_name=env_file_name,
+        silence=silence
+    )
+    if check_res:
+        return True
+    else:
+        return False
+
+
+def tb_exist(
+        tb_name: str,
+        env_file_name: str = env_file_name_default,
+        silence: bool = silence_default,
+):
+    """
+    判断表是否存在
+    """
+    check_sql = f"select 1 from `information_schema`.`tables`  where table_name='{tb_name}';"
+    check_res = query_by_sql(
+        sql=check_sql,
+        db_name='information_schema',
+        env_file_name=env_file_name,
+        silence=silence
+    )
+    if check_res:
+        return True
+    else:
+        return False
+
+
+def db_tb_exist(
+        db_name: str,
+        tb_name: str,
+        env_file_name: str = env_file_name_default,
+        silence: bool = silence_default,
+):
+    """
+    判断数据库的表是否存在
+    """
+    check_sql = f"select 1 from `information_schema`.`tables`  where table_schema='{db_name}' and table_name='{tb_name}';"
+    check_res = query_by_sql(
+        sql=check_sql,
+        db_name='information_schema',
+        env_file_name=env_file_name,
+        silence=silence
+    )
+    if check_res:
+        return True
+    else:
+        return False
