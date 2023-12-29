@@ -930,6 +930,8 @@ def clean_data(
             else:
                 if isinstance(temp_data, np.int64) is True:
                     each_data_list.append(str(temp_data))  # 将 Int64 转换为str
+                elif isinstance(temp_data, np.nan):
+                    each_data_list.append(None)  # 将 nan 转换为 None
                 elif isinstance(temp_data, decimal.Decimal):
                     each_data_list.append(str(temp_data))  # 将 decimal 转换为str
                 elif isinstance(temp_data, datetime.datetime):
