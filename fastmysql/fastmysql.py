@@ -16,7 +16,7 @@ import pymysql
 import time
 import copy
 import envx
-
+import decimal
 import fastmysql
 
 silence_default = True  # 默认静默参数为True
@@ -929,7 +929,13 @@ def clean_data(
                     each_data_list.append("")
             else:
                 if isinstance(temp_data, np.int64) is True:
-                    each_data_list.append(str(temp_data))  # 将Int64转换为str
+                    each_data_list.append(str(temp_data))  # 将 Int64 转换为str
+                elif isinstance(temp_data, decimal.Decimal):
+                    each_data_list.append(str(temp_data))  # 将 decimal 转换为str
+                elif isinstance(temp_data, datetime.datetime):
+                    each_data_list.append(str(temp_data))  # 将 datetime 转换为str
+                elif isinstance(temp_data, list):
+                    each_data_list.append(str(temp_data))  # 将 list 转换为str
                 else:
                     each_data_list.append(temp_data)
         data_list.append(tuple(each_data_list))  # 转换为tuple确保不变
