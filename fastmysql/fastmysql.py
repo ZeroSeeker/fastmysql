@@ -203,29 +203,28 @@ def _query(
         sql: str,
         cur,
         con=None,
-        parameter: tuple = None,
+        parameter: list = None,
         operate: bool = False,  # 是否为操作
         order_dict: bool = True,
-        silence: bool = silence_default,
-        executemany: bool = False
+        silence: bool = silence_default
 ):
     """
     executemany为True时，sql中的参数以%s的形式出现
     查询结果以list(dict)形式输出
     [不包含重试机制，需要在外部执行重试]
-    :param sql:
+    :param sql: 注意sql中含有%s占位符时，不要加引号
     :param cur:
     :param con:
-    :param parameter: 参数化查询语句避免SQL注入
+    :param parameter: 参数化查询语句避免SQL注入list(tuple())
     :param operate: 为True的时候执行操作（执行commit），为False的时候执行查询数据（不执行commit）
     :param order_dict: 返回值是否组成有序dict
     :param silence:设置静默模式，为True表示静默，为False表示非静默
     :return:
     """
-    if not executemany:
-        cur.execute(query=sql, args=parameter)
-    else:
+    if parameter and len(parameter) > 1:
         cur.executemany(query=sql, args=parameter)
+    else:
+        cur.execute(query=sql, args=parameter)
 
     if operate is False:
         # 只查询
