@@ -419,7 +419,7 @@ def query_by_sql(
 
 def do_by_sql(
         sql: str,
-        parameter: tuple = None,
+        parameter: list = None,
         db_name: str = None,
         con_info: dict = None,
         env_file_name: str = env_file_name_default,
