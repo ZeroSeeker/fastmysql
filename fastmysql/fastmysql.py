@@ -220,7 +220,12 @@ def _query(
     :param silence:设置静默模式，为True表示静默，为False表示非静默
     :return:
     """
-    cur.execute(query=sql, args=parameter)
+    sql_list = sql.split(';')
+    if len(sql_list) == 1:
+        cur.execute(query=sql, args=parameter)
+    else:
+        cur.executemany(query=sql, args=parameter)
+
     if operate is False:
         # 只查询
         index = cur.description
