@@ -206,9 +206,11 @@ def _query(
         parameter: tuple = None,
         operate: bool = False,  # 是否为操作
         order_dict: bool = True,
-        silence: bool = silence_default
+        silence: bool = silence_default,
+        executemany: bool = False
 ):
     """
+    executemany为True时，sql中的参数以%s的形式出现
     查询结果以list(dict)形式输出
     [不包含重试机制，需要在外部执行重试]
     :param sql:
@@ -220,8 +222,7 @@ def _query(
     :param silence:设置静默模式，为True表示静默，为False表示非静默
     :return:
     """
-    sql_list = sql.split(';')
-    if len(sql_list) == 1:
+    if not executemany:
         cur.execute(query=sql, args=parameter)
     else:
         cur.executemany(query=sql, args=parameter)
