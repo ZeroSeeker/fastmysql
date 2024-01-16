@@ -220,10 +220,10 @@ def _query(
     :param silence:设置静默模式，为True表示静默，为False表示非静默
     :return:
     """
-    if parameter and len(parameter) > 1:
-        cur.executemany(query=sql, args=parameter)
+    if not parameter:
+        cur.execute(query=sql)
     else:
-        cur.execute(query=sql, args=parameter)
+        cur.executemany(query=sql, args=parameter)
 
     if operate is False:
         # 只查询
@@ -384,7 +384,7 @@ def query_by_sql(
                 res = _query(
                     cur=cur,
                     sql=sql,
-                    parameter=parameter,
+                    parameter=[parameter],
                     order_dict=order_dict,
                     silence=silence
                 )
@@ -418,7 +418,7 @@ def query_by_sql(
 
 def do_by_sql(
         sql: str,
-        parameter: list = None,
+        parameter: tuple = None,
         db_name: str = None,
         con_info: dict = None,
         env_file_name: str = env_file_name_default,
@@ -466,7 +466,7 @@ def do_by_sql(
         try:
             effect_rows = _query(
                 sql=sql,
-                parameter=parameter,
+                parameter=[parameter],
                 cur=cur,
                 con=con,
                 operate=True,
@@ -725,7 +725,7 @@ def column_list(
             all_col_dict = _query(
                 cur=cur,
                 sql=sql1,
-                parameter=(db_name, tb_name),
+                parameter=[(db_name, tb_name)],
                 order_dict=order_dict,
                 silence=silence
             )
@@ -744,7 +744,7 @@ def column_list(
             pk_col_dict = _query(
                 cur=cur,
                 sql=sql2,
-                parameter=(db_name, tb_name),
+                parameter=[(db_name, tb_name)],
                 order_dict=order_dict,
                 silence=silence
             )
