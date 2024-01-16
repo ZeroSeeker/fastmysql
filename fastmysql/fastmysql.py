@@ -17,7 +17,6 @@ import time
 import copy
 import envx
 import decimal
-import fastmysql
 
 silence_default = True  # 默认静默参数为True
 env_file_name_default = 'mysql.env'  # 默认数据库连接环境文件名
@@ -1391,7 +1390,7 @@ def save_as_sql(
             silence=silence
         )
     # ---------------- 固定设置 ----------------
-    SourceServerVersion = fastmysql.query_by_sql(
+    SourceServerVersion = query_by_sql(
         sql='SELECT @@version;',
         env_file_name=env_file_name,
         silence=silence
@@ -1399,20 +1398,20 @@ def save_as_sql(
 
     SourceHost = f"{con_info.get('host')}:{con_info.get('port')}"
 
-    charset = fastmysql.query_by_sql(
+    charset = query_by_sql(
         sql=f"SELECT `DEFAULT_CHARACTER_SET_NAME` FROM `information_schema`.`SCHEMATA` WHERE `schema_name` = '{db_name}';",
         env_file_name=env_file_name,
         silence=silence
     )[0]['DEFAULT_CHARACTER_SET_NAME']  # 获取数据库的charset
 
-    tb_create_sql = fastmysql.show_create_table(
+    tb_create_sql = show_create_table(
         db_name=db_name,
         tb_name=tb_name,
         env_file_name=env_file_name,
         silence=silence
     )
 
-    data = fastmysql.query_table_all_data(
+    data = query_table_all_data(
         db_name=db_name,
         tb_name=tb_name,
         env_file_name=env_file_name,
@@ -1580,7 +1579,7 @@ def replace_into_shard(
     :return:
     """
     shard_tb_name = f"{tb_name}_{str(tb_date).replace('-', '')}"  # 分片表名
-    check_tb_res = fastmysql.db_tb_exist(
+    check_tb_res = db_tb_exist(
         db_name=db_name,
         tb_name=shard_tb_name,
         env_file_name=env_file_name,
@@ -1590,14 +1589,14 @@ def replace_into_shard(
         showlog.info(f'表[{shard_tb_name}]存在')
         if drop:
             # 先删除原来的表再创建
-            fastmysql.do_by_sql(
+            do_by_sql(
                 sql=f'DROP TABLE {db_name}.{shard_tb_name}',
                 db_name=db_name,
                 env_file_name=env_file_name,
                 silence=silence,
                 show_sql=show_sql
             )
-            fastmysql.do_by_sql(
+            do_by_sql(
                 sql=shard_tb_create_sql.replace(shard_tb_create_sql_replace_str, shard_tb_name),
                 db_name=db_name,
                 env_file_name=env_file_name,
@@ -1608,7 +1607,7 @@ def replace_into_shard(
             pass
     else:
         showlog.info(f'表[{shard_tb_name}]不存在，将创建...')
-        fastmysql.do_by_sql(
+        do_by_sql(
             sql=shard_tb_create_sql.replace(shard_tb_create_sql_replace_str, shard_tb_name),
             db_name=db_name,
             env_file_name=env_file_name,
@@ -1616,7 +1615,7 @@ def replace_into_shard(
             show_sql=show_sql
         )
     showlog.info(f'正在向表[{shard_tb_name}]存储数据...')
-    return fastmysql.replace_into(
+    return replace_into(
         data_dict_list=shard_data,
         db_name=db_name,
         tb_name=shard_tb_name,
