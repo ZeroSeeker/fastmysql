@@ -1622,3 +1622,78 @@ def replace_into_shard(
         env_file_name=env_file_name,
         silence=silence
     )
+
+
+def insert_into_shard(
+        db_name: str,
+        tb_name: str,
+        tb_date: str,
+        shard_tb_create_sql: str,
+        shard_data: list,
+        env_file_name: str,
+        ignore: bool = False,
+        shard_tb_create_sql_replace_str: str = '【tb_name】',
+        silence: bool = False,
+        show_sql: bool = True,
+        drop_table: bool = False
+):
+    """
+    自动检查创建shard表并存入数据
+    :param tb_name:
+    :param tb_date:
+    :param shard_tb_create_sql:
+    :param shard_data:
+    :param db_name:
+    :param env_file_name:
+    :param shard_tb_create_sql_replace_str:
+    :param silence:
+    :param show_sql:
+    :param drop_table:
+    :param ignore:
+    :return:
+    """
+    shard_tb_name = f"{tb_name}_{str(tb_date).replace('-', '')}"  # 分片表名
+    check_tb_res = db_tb_exist(
+        db_name=db_name,
+        tb_name=shard_tb_name,
+        env_file_name=env_file_name,
+        silence=silence
+    )  # 检查分片表是否存在
+    if check_tb_res:
+        showlog.info(f'表[{shard_tb_name}]存在')
+        if drop_table:
+            # 先删除原来的表再创建
+            do_by_sql(
+                sql=f'DROP TABLE {db_name}.{shard_tb_name}',
+                db_name=db_name,
+                env_file_name=env_file_name,
+                silence=silence,
+                show_sql=show_sql
+            )
+            do_by_sql(
+                sql=shard_tb_create_sql.replace(shard_tb_create_sql_replace_str, shard_tb_name),
+                db_name=db_name,
+                env_file_name=env_file_name,
+                silence=silence,
+                show_sql=show_sql
+            )
+        else:
+            pass
+    else:
+        showlog.info(f'表[{shard_tb_name}]不存在，将创建...')
+        do_by_sql(
+            sql=shard_tb_create_sql.replace(shard_tb_create_sql_replace_str, shard_tb_name),
+            db_name=db_name,
+            env_file_name=env_file_name,
+            silence=silence,
+            show_sql=show_sql
+        )
+    showlog.info(f'正在向表[{shard_tb_name}]存储数据...')
+    return insert(
+        data_dict_list=shard_data,
+        db_name=db_name,
+        tb_name=shard_tb_name,
+        env_file_name=env_file_name,
+        silence=silence,
+        ignore=ignore
+    )
