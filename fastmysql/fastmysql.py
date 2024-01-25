@@ -1066,8 +1066,7 @@ def insert(
         auto_reconnect: bool = True,
         reconnect_wait: int = default_reconnect_wait,
         ignore: bool = False,
-        date2str: bool = True,
-        date2str_f: str = '%Y-%m-%d'
+        str_f: str = None
 ):
     """
     此模块的功能是插入和自动更新
@@ -1082,6 +1081,7 @@ def insert(
     :param auto_reconnect: 自动重连
     :param reconnect_wait: 重连等待时间，单位为秒，默认为5秒
     :param ignore: 忽略错误，例如主键重复的记录不会被插入
+    :param str_f: 时间或者日期格式，例如 %Y-%m-%d %H:%M:%S
     """
     # ---------------- 固定设置 ----------------
     if not con_info:
@@ -1142,9 +1142,18 @@ def insert(
                             each_insert_data_list.append(None)
                         else:
                             each_insert_data_list.append("")
-                    elif isinstance(each_data_value, datetime.date) and date2str:
+                    elif isinstance(each_data_value, datetime.datetime):
+                        # 将datetime转化为字符串插入
+                        if str_f:
+                            each_insert_data_list.append(each_data_value.strftime(str_f))
+                        else:
+                            each_insert_data_list.append(each_data_value.strftime('%Y-%m-%d %H:%M:%S'))
+                    elif isinstance(each_data_value, datetime.date):
                         # 将date转化为字符串插入
-                        each_insert_data_list.append(each_data_value.strftime(date2str_f))
+                        if str_f:
+                            each_insert_data_list.append(each_data_value.strftime(str_f))
+                        else:
+                            each_insert_data_list.append(each_data_value.strftime('%Y-%m-%d'))
                     else:
                         each_insert_data_list.append(each_data_value)
                 insert_data_list.append(tuple(each_insert_data_list))
