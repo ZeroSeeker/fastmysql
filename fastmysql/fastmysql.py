@@ -884,6 +884,8 @@ def clean_data(
         db_name: str,
         tb_name: str,
         replace_space_to_none: bool = True,  # 自动将空值null改为None
+        operate: str = "REPLACE",
+        ignore: bool = False
 ):
     """
     功能性模块
@@ -893,6 +895,8 @@ def clean_data(
     :param db_name:
     :param tb_name:
     :param replace_space_to_none:
+    :param operate:
+    :param ignore:
     """
     data_dict_list_temp = copy.deepcopy(data_dict_list)  # 深度拷贝，不更改源数据
     all_col_list = column_info_dict.get('all_col_list')  # 所有列名
@@ -916,8 +920,15 @@ def clean_data(
         insert_data_arg_list.append("%s")
     data_tuple = ",".join(insert_data_arg_list)
     # 生成插入语句模板
-    operate_clause = 'REPLACE INTO `%s`.`%s`(`%s`) VALUES(%s)' % \
-                     (db_name, tb_name, operate_clause_tuple, data_tuple)
+    if operate.upper() == 'REPLACE':
+        operate_clause = "REPLACE INTO `%s`.`%s`(`%s`) VALUES(%s)" % (db_name, tb_name, operate_clause_tuple, data_tuple)
+    elif operate.upper() == 'INSERT':
+        if ignore:
+            operate_clause = "INSERT INTO `%s`.`%s`(`%s`) VALUES(%s)" % (db_name, tb_name, operate_clause_tuple, data_tuple)
+        else:
+            operate_clause = "INSERT IGNORE INTO `%s`.`%s`(`%s`) VALUES(%s)" % (db_name, tb_name, operate_clause_tuple, data_tuple)
+    else:
+        return
 
     # step3:
     # 生成插入数据tuple
@@ -938,8 +949,8 @@ def clean_data(
                 #     each_data_list.append(None)  # 将 nan 转换为 None
                 elif isinstance(temp_data, decimal.Decimal):
                     each_data_list.append(str(temp_data))  # 将 decimal 转换为str
-                elif isinstance(temp_data, datetime.datetime):
-                    each_data_list.append(str(temp_data))  # 将 datetime 转换为str
+                elif isinstance(temp_data, datetime.datetime) or isinstance(temp_data, datetime.date):
+                    each_data_list.append(str(temp_data))  # 将 datetime/date 转换为str
                 elif isinstance(temp_data, list):
                     each_data_list.append(str(temp_data))  # 将 list 转换为str
                 else:
@@ -1015,6 +1026,7 @@ def replace_into(
                     data_dict_list=data_dict_list,
                     db_name=db_name,
                     tb_name=tb_name,
+                    operate="REPLACE"
                 )
                 while True:
                     try:
@@ -1561,25 +1573,299 @@ def db_tb_exist(
         return False
 
 
-def replace_into_shard(
-        tb_name: str,
-        tb_date: str,
-        shard_tb_create_sql: str,
-        shard_data: list,
-        db_name: str,
-        env_file_name: str,
+# def replace_into_shard(
+#         tb_name: str,
+#         tb_date: str,
+#         shard_tb_create_sql: str,
+#         shard_data: list,
+#         db_name: str,
+#         env_file_name: str,
+#         shard_tb_create_sql_replace_str: str = '【tb_name】',
+#         silence: bool = False,
+#         show_sql: bool = True,
+#         drop: bool = False
+# ):
+#     """
+#     自动检查创建shard表并存入数据
+#     :param tb_name:
+#     :param tb_date:
+#     :param shard_tb_create_sql:
+#     :param shard_data:
+#     :param db_name:
+#     :param env_file_name:
+#     :param shard_tb_create_sql_replace_str:
+#     :param silence:
+#     :param show_sql:
+#     :param drop:
+#     :return:
+#     """
+#     shard_tb_name = f"{tb_name}_{str(tb_date).replace('-', '')}"  # 分片表名
+#     check_tb_res = db_tb_exist(
+#         db_name=db_name,
+#         tb_name=shard_tb_name,
+#         env_file_name=env_file_name,
+#         silence=silence
+#     )  # 检查分片表是否存在
+#     if check_tb_res:
+#         showlog.info(f'表[{shard_tb_name}]存在')
+#         if drop:
+#             # 先删除原来的表再创建
+#             do_by_sql(
+#                 sql=f'DROP TABLE {db_name}.{shard_tb_name}',
+#                 db_name=db_name,
+#                 env_file_name=env_file_name,
+#                 silence=silence,
+#                 show_sql=show_sql
+#             )
+#             do_by_sql(
+#                 sql=shard_tb_create_sql.replace(shard_tb_create_sql_replace_str, shard_tb_name),
+#                 db_name=db_name,
+#                 env_file_name=env_file_name,
+#                 silence=silence,
+#                 show_sql=show_sql
+#             )
+#         else:
+#             pass
+#     else:
+#         showlog.info(f'表[{shard_tb_name}]不存在，将创建...')
+#         do_by_sql(
+#             sql=shard_tb_create_sql.replace(shard_tb_create_sql_replace_str, shard_tb_name),
+#             db_name=db_name,
+#             env_file_name=env_file_name,
+#             silence=silence,
+#             show_sql=show_sql
+#         )
+#     showlog.info(f'正在向表[{shard_tb_name}]存储数据...')
+#     return replace_into(
+#         data_dict_list=shard_data,
+#         db_name=db_name,
+#         tb_name=shard_tb_name,
+#         env_file_name=env_file_name,
+#         silence=silence
+#     )
+
+
+# def insert_into_shard(
+#         db_name: str,
+#         tb_name: str,
+#         tb_date: str,
+#         shard_tb_create_sql: str,
+#         shard_data: list,
+#         env_file_name: str,
+#         ignore: bool = False,
+#         shard_tb_create_sql_replace_str: str = '【tb_name】',
+#         silence: bool = False,
+#         show_sql: bool = True,
+#         drop_table: bool = False
+# ):
+#     """
+#     自动检查创建shard表并存入数据
+#     :param tb_name:
+#     :param tb_date:
+#     :param shard_tb_create_sql:
+#     :param shard_data:
+#     :param db_name:
+#     :param env_file_name:
+#     :param shard_tb_create_sql_replace_str:
+#     :param silence:
+#     :param show_sql:
+#     :param drop_table:
+#     :param ignore:
+#     :return:
+#     """
+#     shard_tb_name = f"{tb_name}_{str(tb_date).replace('-', '')}"  # 分片表名
+#     check_tb_res = db_tb_exist(
+#         db_name=db_name,
+#         tb_name=shard_tb_name,
+#         env_file_name=env_file_name,
+#         silence=silence
+#     )  # 检查分片表是否存在
+#     if check_tb_res:
+#         showlog.info(f'表[{shard_tb_name}]存在')
+#         if drop_table:
+#             # 先删除原来的表再创建
+#             do_by_sql(
+#                 sql=f'DROP TABLE {db_name}.{shard_tb_name}',
+#                 db_name=db_name,
+#                 env_file_name=env_file_name,
+#                 silence=silence,
+#                 show_sql=show_sql
+#             )
+#             do_by_sql(
+#                 sql=shard_tb_create_sql.replace(shard_tb_create_sql_replace_str, shard_tb_name),
+#                 db_name=db_name,
+#                 env_file_name=env_file_name,
+#                 silence=silence,
+#                 show_sql=show_sql
+#             )
+#         else:
+#             pass
+#     else:
+#         showlog.info(f'表[{shard_tb_name}]不存在，将创建...')
+#         do_by_sql(
+#             sql=shard_tb_create_sql.replace(shard_tb_create_sql_replace_str, shard_tb_name),
+#             db_name=db_name,
+#             env_file_name=env_file_name,
+#             silence=silence,
+#             show_sql=show_sql
+#         )
+#     showlog.info(f'正在向表[{shard_tb_name}]存储数据...')
+#     return upload(
+#         data=shard_data,
+#         target_database=db_name,
+#         target_table=shard_tb_name,
+#         env_file_name=env_file_name,
+#         silence=silence,
+#         replace=False,
+#         ignore=ignore
+#     )
+
+
+def upload(
+        data: list,
+        target_database: str,
+        target_table: str,
+        replace: bool = False,
+        ignore: bool = False,
+        env_file_name: str = env_file_name_default,
+        pk_col_list: list = None,
+        silence: bool = silence_default,
+        auto_reconnect: bool = True,
+        reconnect_wait: int = default_reconnect_wait,
+        con_info: dict = None,
+):
+    """
+    上传数据，合成了insert和replace两种方法
+    插入和自动更新，注意，这里的更新是先对原来的数据删除，再插入，不适用于局部更新！
+    【包含重试机制】
+    :param data: 数据[{},{}]
+    :param target_database: 数据库名
+    :param target_table: 表名
+    :param replace: 是否使用replace，若为False，将使用insert
+    :param ignore: 只有在insert时才会生效
+    :param con_info: 若指定，将优先使用
+    :param env_file_name:
+    :param pk_col_list: 主键列表
+    :param silence:
+    :param auto_reconnect: 自动重连
+    :param reconnect_wait: 重连等待时间，单位为秒，默认为5秒
+    """
+    try:
+        # ---------------- 固定设置 ----------------
+        if not con_info:
+            con_info = make_con_info(
+                env_file_name=env_file_name,
+                silence=silence
+            )
+        con, cur = con2db(
+            con_info=con_info,
+            db_name=target_database,
+            silence=silence,
+            auto_reconnect=auto_reconnect,
+            reconnect_wait=reconnect_wait
+        )  # 已包含重试机制
+        # ---------------- 固定设置 ----------------
+        if not data:
+            return True
+        else:
+            column_info = column_list(
+                db_name=target_database,
+                tb_name=target_table,
+                con_info=con_info,
+                auto_reconnect=auto_reconnect,
+                reconnect_wait=reconnect_wait,
+                silence=silence
+            )  # 获取列名信息
+            if column_info:  # 若未获取到列名信息，提示错误并退出
+                all_col_list, pk_col_list_get, data_col_list = column_info  # 获取到列名信息
+                column_info_dict = {
+                    'all_col_list': all_col_list,
+                    'data_col_list': data_col_list,
+                }
+                if pk_col_list:
+                    column_info_dict['pk_col_list'] = pk_col_list  # 使用自定义主键列表
+                else:
+                    column_info_dict['pk_col_list'] = pk_col_list_get  # 使用数据库中定义的主键列表
+                if replace:
+                    operate = "REPLACE"
+                else:
+                    operate = "INSERT"
+                operate_clause, data_list_single = clean_data(
+                    column_info_dict=column_info_dict,
+                    data_dict_list=data,
+                    db_name=target_database,
+                    tb_name=target_table,
+                    operate=operate,
+                    ignore=ignore
+                )
+                while True:
+                    try:
+                        if not silence:
+                            showlog.info('operating %s data...' % len(data_list_single))
+                        cur.executemany(query=operate_clause, args=list(data_list_single))
+                        rows = cur.rowcount
+                        con.commit()
+                        if not silence:
+                            showlog.info("operate success.")
+                        close_conn(conn=con, cursor=cur)  # 关闭连接
+                        return rows
+                    except reconnect_errors:
+                        if auto_reconnect:
+                            if not silence:
+                                showlog.error(f'Oops, reconnect_errors, Trying to reconnect in {reconnect_wait} seconds ...')
+                            time.sleep(reconnect_wait)
+                            con, cur = con2db(
+                                con_info=con_info,
+                                db_name=target_database,
+                                silence=silence,
+                                auto_reconnect=auto_reconnect,
+                                reconnect_wait=reconnect_wait
+                            )  # 已包含重试机制
+                        else:
+                            return False
+                    except:
+                        if not silence:
+                            showlog.error("operate failure.operate_clause: %s" % operate_clause)
+                            print(operate_clause, list(data_list_single)[0])
+                        return False
+            else:
+                if not silence:
+                    showlog.warning("Oops! can't get column_info.")
+                return False
+    except:
+        if not silence:
+            showlog.error("Oops! an error occurred!")
+        return False
+
+
+def upload_shard(
+        data: list,
+        target_database: str,
+        target_table: str,
+        shard_mark: str,
+        shard_sql: str,
+        replace: bool = False,
+        ignore: bool = False,
+
+        env_file_name: str = env_file_name_default,
         shard_tb_create_sql_replace_str: str = '【tb_name】',
         silence: bool = False,
         show_sql: bool = True,
         drop: bool = False
 ):
     """
+    上传数据到shard
     自动检查创建shard表并存入数据
-    :param tb_name:
-    :param tb_date:
-    :param shard_tb_create_sql:
-    :param shard_data:
-    :param db_name:
+
+    :param data: 数据[{},{}]
+    :param target_database: 数据库名
+    :param target_table: 表名
+    :param shard_mark: 分表标记，例如20230101
+    :param shard_sql: 分表的建表sql
+    :param replace: 是否使用replace，若为False，将使用insert
+    :param ignore: 只有在insert时才会生效
+
+    :param target_database:
     :param env_file_name:
     :param shard_tb_create_sql_replace_str:
     :param silence:
@@ -1587,122 +1873,53 @@ def replace_into_shard(
     :param drop:
     :return:
     """
-    shard_tb_name = f"{tb_name}_{str(tb_date).replace('-', '')}"  # 分片表名
-    check_tb_res = db_tb_exist(
-        db_name=db_name,
-        tb_name=shard_tb_name,
-        env_file_name=env_file_name,
-        silence=silence
-    )  # 检查分片表是否存在
-    if check_tb_res:
-        showlog.info(f'表[{shard_tb_name}]存在')
-        if drop:
-            # 先删除原来的表再创建
-            do_by_sql(
-                sql=f'DROP TABLE {db_name}.{shard_tb_name}',
-                db_name=db_name,
-                env_file_name=env_file_name,
-                silence=silence,
-                show_sql=show_sql
-            )
-            do_by_sql(
-                sql=shard_tb_create_sql.replace(shard_tb_create_sql_replace_str, shard_tb_name),
-                db_name=db_name,
-                env_file_name=env_file_name,
-                silence=silence,
-                show_sql=show_sql
-            )
-        else:
-            pass
-    else:
-        showlog.info(f'表[{shard_tb_name}]不存在，将创建...')
+    shard_table = f"{target_table}_{str(shard_mark).replace('-', '')}"  # 分片表名
+    if drop:
+        # 先删除，再建表
         do_by_sql(
-            sql=shard_tb_create_sql.replace(shard_tb_create_sql_replace_str, shard_tb_name),
-            db_name=db_name,
+            sql=f'DROP TABLE {target_database}.{shard_table}',
+            db_name=target_database,
             env_file_name=env_file_name,
             silence=silence,
             show_sql=show_sql
         )
-    showlog.info(f'正在向表[{shard_tb_name}]存储数据...')
-    return replace_into(
-        data_dict_list=shard_data,
-        db_name=db_name,
-        tb_name=shard_tb_name,
-        env_file_name=env_file_name,
-        silence=silence
-    )
-
-
-def insert_into_shard(
-        db_name: str,
-        tb_name: str,
-        tb_date: str,
-        shard_tb_create_sql: str,
-        shard_data: list,
-        env_file_name: str,
-        ignore: bool = False,
-        shard_tb_create_sql_replace_str: str = '【tb_name】',
-        silence: bool = False,
-        show_sql: bool = True,
-        drop_table: bool = False
-):
-    """
-    自动检查创建shard表并存入数据
-    :param tb_name:
-    :param tb_date:
-    :param shard_tb_create_sql:
-    :param shard_data:
-    :param db_name:
-    :param env_file_name:
-    :param shard_tb_create_sql_replace_str:
-    :param silence:
-    :param show_sql:
-    :param drop_table:
-    :param ignore:
-    :return:
-    """
-    shard_tb_name = f"{tb_name}_{str(tb_date).replace('-', '')}"  # 分片表名
-    check_tb_res = db_tb_exist(
-        db_name=db_name,
-        tb_name=shard_tb_name,
-        env_file_name=env_file_name,
-        silence=silence
-    )  # 检查分片表是否存在
-    if check_tb_res:
-        showlog.info(f'表[{shard_tb_name}]存在')
-        if drop_table:
-            # 先删除原来的表再创建
-            do_by_sql(
-                sql=f'DROP TABLE {db_name}.{shard_tb_name}',
-                db_name=db_name,
-                env_file_name=env_file_name,
-                silence=silence,
-                show_sql=show_sql
-            )
-            do_by_sql(
-                sql=shard_tb_create_sql.replace(shard_tb_create_sql_replace_str, shard_tb_name),
-                db_name=db_name,
-                env_file_name=env_file_name,
-                silence=silence,
-                show_sql=show_sql
-            )
-        else:
-            pass
-    else:
-        showlog.info(f'表[{shard_tb_name}]不存在，将创建...')
         do_by_sql(
-            sql=shard_tb_create_sql.replace(shard_tb_create_sql_replace_str, shard_tb_name),
-            db_name=db_name,
+            sql=shard_sql.replace(shard_tb_create_sql_replace_str, shard_table),
+            db_name=target_database,
             env_file_name=env_file_name,
             silence=silence,
             show_sql=show_sql
         )
-    showlog.info(f'正在向表[{shard_tb_name}]存储数据...')
-    return insert(
-        data_dict_list=shard_data,
-        db_name=db_name,
-        tb_name=shard_tb_name,
+    else:
+        check_tb_res = db_tb_exist(
+            db_name=target_database,
+            tb_name=shard_table,
+            env_file_name=env_file_name,
+            silence=silence
+        )  # 检查分片表是否存在
+        if check_tb_res:
+            if not silence:
+                showlog.info(f'表[{shard_table}]存在')
+            else:
+                pass
+        else:
+            if not silence:
+                showlog.info(f'表[{shard_table}]不存在，将创建...')
+            do_by_sql(
+                sql=shard_sql.replace(shard_tb_create_sql_replace_str, shard_table),
+                db_name=target_database,
+                env_file_name=env_file_name,
+                silence=silence,
+                show_sql=show_sql
+            )
+    if not silence:
+        showlog.info(f'正在向表[{shard_table}]存储数据...')
+    return upload(
+        data=data,
+        target_database=target_database,
+        target_table=shard_table,
         env_file_name=env_file_name,
         silence=silence,
+        replace=replace,
         ignore=ignore
     )
