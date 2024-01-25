@@ -1147,13 +1147,13 @@ def insert(
                         if str_f:
                             each_insert_data_list.append(each_data_value.strftime(str_f))
                         else:
-                            each_insert_data_list.append(each_data_value.strftime('%Y-%m-%d %H:%M:%S'))
+                            each_insert_data_list.append(str(each_data_value))
                     elif isinstance(each_data_value, datetime.date):
                         # 将date转化为字符串插入
                         if str_f:
                             each_insert_data_list.append(each_data_value.strftime(str_f))
                         else:
-                            each_insert_data_list.append(each_data_value.strftime('%Y-%m-%d'))
+                            each_insert_data_list.append(str(each_data_value))
                     else:
                         each_insert_data_list.append(each_data_value)
                 insert_data_list.append(tuple(each_insert_data_list))
