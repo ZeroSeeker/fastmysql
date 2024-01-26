@@ -20,7 +20,7 @@ import decimal
 
 silence_default = True  # 默认静默参数为True
 env_file_name_default = 'mysql.env'  # 默认数据库连接环境文件名
-reconnect_errors = (ConnectionError, ConnectionAbortedError, TimeoutError, pymysql.err.ProgrammingError)
+reconnect_errors = (ConnectionError, ConnectionAbortedError, TimeoutError)
 default_charset = 'utf8'
 default_show_sql = False
 default_reconnect_wait = 60
@@ -321,6 +321,11 @@ def query_table_all_data(
                     )  # 已包含重试机制
                 else:
                     return
+            except pymysql.err.ProgrammingError as pymysql_err:
+                err_code, err_msg = pymysql_err.args
+                if not silence:
+                    showlog.error(err_msg)
+                return
             except Exception as ex:
                 if not silence:
                     showlog.warning(f"Oops! an error occurred, Exception: {ex}")
