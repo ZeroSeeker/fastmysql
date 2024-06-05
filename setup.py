@@ -35,7 +35,7 @@ setuptools.setup(
         'pytz==2022.1',
         'showlog>=0.0.6',
         'six==1.16.0',
-        'tqdm==4.61.2',
+        'tqdm>=4.61.2',
         'DBUtils==3.0.3'
     ]
 )
