@@ -1083,7 +1083,8 @@ def insert(
         auto_reconnect: bool = True,
         reconnect_wait: int = default_reconnect_wait,
         ignore: bool = False,
-        str_f: str = None
+        str_f: str = None,
+        ignore_pk: list = None
 ):
     """
     此模块的功能是插入和自动更新
@@ -1099,6 +1100,7 @@ def insert(
     :param reconnect_wait: 重连等待时间，单位为秒，默认为5秒
     :param ignore: 忽略错误，例如主键重复的记录不会被插入
     :param str_f: 时间或者日期格式，例如 %Y-%m-%d %H:%M:%S
+    :param ignore_pk: 在自动更新时会识别主键，这里可以选择忽略某些字段，例如自增的id:['id']
     """
     # ---------------- 固定设置 ----------------
     if not con_info:
@@ -1146,7 +1148,20 @@ def insert(
             if ignore:
                 insert_clause = f'INSERT IGNORE INTO `{db_name}`.`{tb_name}`(`{insert_clause_tuple}`) VALUES({insert_data_tuple})'
             else:
-                insert_clause = f'INSERT INTO `{db_name}`.`{tb_name}`(`{insert_clause_tuple}`) VALUES({insert_data_tuple})'
+                if not ignore_pk:
+                    ignore_pk = []
+                if pk_col_list:
+                    uu_str_list = list()
+                    for each_pk_col in pk_col_list:
+                        if each_pk_col in ignore_pk:  # 忽略特定字段
+                            continue
+                        else:
+                            each_uu_str = f"{each_pk_col} = VALUES({each_pk_col})"
+                            uu_str_list.append(each_uu_str)
+                    uu_str = ",".join(uu_str_list)  # 拼接更新语句
+                    insert_clause = f'INSERT INTO `{db_name}`.`{tb_name}`(`{insert_clause_tuple}`) VALUES({insert_data_tuple}) ON DUPLICATE KEY UPDATE {uu_str}'
+                else:
+                    insert_clause = f'INSERT INTO `{db_name}`.`{tb_name}`(`{insert_clause_tuple}`) VALUES({insert_data_tuple})'
 
             # 生成插入数据tuple
             insert_data_list = list()
