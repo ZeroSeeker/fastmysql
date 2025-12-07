@@ -232,12 +232,12 @@ def _query(
     else:
         cur.executemany(query=sql, args=parameter)
 
-    if operate is False:
+    if not operate:
         # 只查询
         index = cur.description
         result = list()
         for res in cur.fetchall():
-            if order_dict is True:
+            if order_dict:
                 row = OrderedDict()
             else:
                 row = dict()
