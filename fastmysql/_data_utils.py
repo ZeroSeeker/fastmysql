@@ -3,6 +3,7 @@
 
 import datetime
 import decimal
+import json
 
 import numpy as np
 
@@ -97,6 +98,8 @@ def normalize_write_value(
         return str(value)
     if decimal_to_str and isinstance(value, decimal.Decimal):
         return str(value)
+    if isinstance(value, dict):
+        return json.dumps(value, ensure_ascii=False, sort_keys=True)
     if isinstance(value, datetime.datetime):
         if str_f:
             return value.strftime(str_f)

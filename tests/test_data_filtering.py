@@ -98,6 +98,20 @@ class FilterDataDictListByColumnsTests(unittest.TestCase):
             {("3", "1.23", "['a']", "2024-01-04", None)}
         )
 
+    def test_build_data_tuple_set_supports_dict_values(self):
+        data_tuple_set = data_utils_module.build_data_tuple_set(
+            data_dict_list=[
+                {"payload": {"b": 2, "a": 1}, "name": "alice"},
+                {"payload": {"a": 1, "b": 2}, "name": "alice"},
+            ],
+            param_list=["payload", "name"]
+        )
+
+        self.assertEqual(
+            data_tuple_set,
+            {('{"a": 1, "b": 2}', "alice")}
+        )
+
     def test_fastmysql_filter_keeps_valid_columns_without_mutating_input(self):
         raw = [
             {"id": 1, "name": "alice", "extra": "x"},
