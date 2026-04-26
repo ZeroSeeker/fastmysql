@@ -17,6 +17,12 @@ import time
 import copy
 import envx
 import decimal
+from ._data_utils import (
+    build_insert_data_list,
+    collect_data_dict_keys,
+    filter_data_dict_list_by_columns,
+    prepare_data_with_column_info,
+)
 
 silence_default = True  # 默认静默参数为True
 env_file_name_default = 'mysql.env'  # 默认数据库连接环境文件名
@@ -889,7 +895,6 @@ def information_schema(
     )
     return res
 
-
 def clean_data(
         data_dict_list: list,
         column_info_dict: dict,
@@ -911,18 +916,12 @@ def clean_data(
     :param ignore:
     """
     data_dict_list_temp = copy.deepcopy(data_dict_list)  # 深度拷贝，不更改源数据
-    all_col_list = column_info_dict.get('all_col_list')  # 所有列名
 
-    # 按照目标表的结构格式化data_dict_list，去除额外列的数据，只保留预设列的数据
-    # step1: 清洗数据
+    # step1: 基于已过滤后的数据收集本次写入涉及的列
     operate_param_set = set()
     for each_data_dict in data_dict_list_temp:  # 遍历数据list里的所有dict
-        each_data_dict_copy = copy.deepcopy(each_data_dict)
-        for each_key, each_value in each_data_dict_copy.items():  # 遍历单个dict的所有的key
-            if each_key in all_col_list:  # 若key在all_col_list中，则收集该key，否则将删除key以及对应的数据，最终得到需要插入数据的列名列表
-                operate_param_set.add(each_key)
-            else:
-                del each_data_dict[each_key]
+        for each_key in each_data_dict:  # 遍历单个dict的所有key
+            operate_param_set.add(each_key)
 
     # step2: 生成操作语句模板
     operate_param_list = list(operate_param_set)  # 生成插入参数list
@@ -1023,19 +1022,18 @@ def replace_into(
                 silence=silence
             )  # 获取列名信息
             if column_info:  # 若未获取到列名信息，提示错误并退出
-                all_col_list, pk_col_list_get, data_col_list = column_info  # 获取到列名信息
-                column_info_dict = {
-                    'all_col_list': all_col_list,
-                    'data_col_list': data_col_list,
-                }
-                if pk_col_list:
-                    column_info_dict['pk_col_list'] = pk_col_list  # 使用自定义主键列表
-                else:
-                    column_info_dict['pk_col_list'] = pk_col_list_get  # 使用数据库中定义的主键列表
+                data_dict_list_filtered, column_info_dict = prepare_data_with_column_info(
+                    data_dict_list=data_dict_list,
+                    column_info=column_info,
+                    pk_col_list=pk_col_list
+                )
+                if not data_dict_list_filtered:
+                    close_conn(conn=con, cursor=cur)
+                    return True
 
                 operate_clause, data_list_single = clean_data(
                     column_info_dict=column_info_dict,
-                    data_dict_list=data_dict_list,
+                    data_dict_list=data_dict_list_filtered,
                     db_name=db_name,
                     tb_name=tb_name,
                     operate="REPLACE"
@@ -1123,6 +1121,9 @@ def insert(
         reconnect_wait=reconnect_wait
     )  # 已包含重试机制
     # ---------------- 固定设置 ----------------
+    if not data_dict_list:
+        close_conn(conn=con, cursor=cur)
+        return True
     try:
         # 获取列名信息
         column_info = column_list(
@@ -1135,17 +1136,14 @@ def insert(
         )
         if column_info:  # 若未获取到列名信息，提示错误并退出
             all_col_list, pk_col_list, data_col_list = column_info  # 获取到列名信息
-            # 按照目标表的结构格式化data_dict_list，去除额外列的数据，只保留预设列的数据
-            insert_param_set = set()
-            for each_data_dict in data_dict_list:  # 遍历数据list里的所有dict
-                each_data_dict_in = each_data_dict.copy()  # 复制一份避免发生更改dict的错误
-                for each in each_data_dict_in:  # 遍历单个dict的所有的key
-                    if each in all_col_list:  # 若key在all_col_list中，则收集该key，否则将删除key以及对应的数据，最终得到需要插入数据的列名列表
-                        insert_param_set.add(each)
-                    else:
-                        del each_data_dict[each]
-
-            insert_param_list = list(insert_param_set)  # 生成插入参数list
+            data_dict_list_filtered = filter_data_dict_list_by_columns(
+                data_dict_list=data_dict_list,
+                all_col_list=all_col_list
+            )
+            if not data_dict_list_filtered:
+                close_conn(conn=con, cursor=cur)
+                return True
+            insert_param_list = collect_data_dict_keys(data_dict_list_filtered)  # 生成插入参数list
             insert_clause_tuple = "`,`".join(insert_param_list)
             insert_data_arg_list = list()
             for _ in insert_param_list:
@@ -1173,33 +1171,12 @@ def insert(
                     insert_clause = f'INSERT INTO `{db_name}`.`{tb_name}`(`{insert_clause_tuple}`) VALUES({insert_data_tuple})'
 
             # 生成插入数据tuple
-            insert_data_list = list()
-            for each_data_dict in data_dict_list:
-                each_insert_data_list = list()
-                for each_data_key in insert_param_list:
-                    each_data_value = each_data_dict.get(each_data_key)
-                    if each_data_value == "":
-                        if replace_space_to_none is True:
-                            each_insert_data_list.append(None)
-                        else:
-                            each_insert_data_list.append("")
-                    elif isinstance(each_data_value, datetime.datetime):
-                        # 将datetime转化为字符串插入
-                        if str_f:
-                            each_insert_data_list.append(each_data_value.strftime(str_f))
-                        else:
-                            each_insert_data_list.append(str(each_data_value))
-                    elif isinstance(each_data_value, datetime.date):
-                        # 将date转化为字符串插入
-                        if str_f:
-                            each_insert_data_list.append(each_data_value.strftime(str_f))
-                        else:
-                            each_insert_data_list.append(str(each_data_value))
-                    else:
-                        each_insert_data_list.append(each_data_value)
-                insert_data_list.append(tuple(each_insert_data_list))
-
-            insert_data_list = set(insert_data_list)  # set去重
+            insert_data_list = build_insert_data_list(
+                data_dict_list=data_dict_list_filtered,
+                insert_param_list=insert_param_list,
+                replace_space_to_none=replace_space_to_none,
+                str_f=str_f
+            )
 
             while True:
                 try:
@@ -1806,22 +1783,21 @@ def upload(
                 silence=silence
             )  # 获取列名信息
             if column_info:  # 若未获取到列名信息，提示错误并退出
-                all_col_list, pk_col_list_get, data_col_list = column_info  # 获取到列名信息
-                column_info_dict = {
-                    'all_col_list': all_col_list,
-                    'data_col_list': data_col_list,
-                }
-                if pk_col_list:
-                    column_info_dict['pk_col_list'] = pk_col_list  # 使用自定义主键列表
-                else:
-                    column_info_dict['pk_col_list'] = pk_col_list_get  # 使用数据库中定义的主键列表
+                data_filtered, column_info_dict = prepare_data_with_column_info(
+                    data_dict_list=data,
+                    column_info=column_info,
+                    pk_col_list=pk_col_list
+                )
+                if not data_filtered:
+                    close_conn(conn=con, cursor=cur)
+                    return 0
                 if replace:
                     operate = "REPLACE"
                 else:
                     operate = "INSERT"
                 operate_clause, data_list_single = clean_data(
                     column_info_dict=column_info_dict,
-                    data_dict_list=data,
+                    data_dict_list=data_filtered,
                     db_name=target_database,
                     tb_name=target_table,
                     operate=operate,
