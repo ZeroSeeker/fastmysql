@@ -2,6 +2,9 @@
 # coding = utf8
 
 import datetime
+import decimal
+
+import numpy as np
 
 
 def filter_data_dict_list_by_columns(
@@ -66,27 +69,72 @@ def build_insert_data_list(
     """
     将字典列表转换为 executemany 所需的 tuple 列表，并做基础值格式化
     """
-    insert_data_list = list()
+    return build_data_tuple_set(
+        data_dict_list=data_dict_list,
+        param_list=insert_param_list,
+        replace_space_to_none=replace_space_to_none,
+        str_f=str_f
+    )
+
+
+def normalize_write_value(
+        value,
+        replace_space_to_none: bool = True,
+        str_f: str = None,
+        int64_to_str: bool = False,
+        decimal_to_str: bool = False,
+        list_to_str: bool = False
+):
+    """
+    统一写入前的值格式化逻辑，通过参数控制具体转换策略
+    """
+    if value == "":
+        if replace_space_to_none is True:
+            return None
+        return ""
+
+    if int64_to_str and isinstance(value, np.int64):
+        return str(value)
+    if decimal_to_str and isinstance(value, decimal.Decimal):
+        return str(value)
+    if isinstance(value, datetime.datetime):
+        if str_f:
+            return value.strftime(str_f)
+        return str(value)
+    if isinstance(value, datetime.date):
+        if str_f:
+            return value.strftime(str_f)
+        return str(value)
+    if list_to_str and isinstance(value, list):
+        return str(value)
+    return value
+
+
+def build_data_tuple_set(
+        data_dict_list: list,
+        param_list: list,
+        replace_space_to_none: bool = True,
+        str_f: str = None,
+        int64_to_str: bool = False,
+        decimal_to_str: bool = False,
+        list_to_str: bool = False
+):
+    """
+    将字典列表转换为按 param_list 排序的 tuple 集合
+    """
+    data_list = list()
     for each_data_dict in data_dict_list:
-        each_insert_data_list = list()
-        for each_data_key in insert_param_list:
-            each_data_value = each_data_dict.get(each_data_key)
-            if each_data_value == "":
-                if replace_space_to_none is True:
-                    each_insert_data_list.append(None)
-                else:
-                    each_insert_data_list.append("")
-            elif isinstance(each_data_value, datetime.datetime):
-                if str_f:
-                    each_insert_data_list.append(each_data_value.strftime(str_f))
-                else:
-                    each_insert_data_list.append(str(each_data_value))
-            elif isinstance(each_data_value, datetime.date):
-                if str_f:
-                    each_insert_data_list.append(each_data_value.strftime(str_f))
-                else:
-                    each_insert_data_list.append(str(each_data_value))
-            else:
-                each_insert_data_list.append(each_data_value)
-        insert_data_list.append(tuple(each_insert_data_list))
-    return set(insert_data_list)
+        each_data_list = list()
+        for each_data_key in param_list:
+            each_data_list.append(
+                normalize_write_value(
+                    value=each_data_dict.get(each_data_key),
+                    replace_space_to_none=replace_space_to_none,
+                    str_f=str_f,
+                    int64_to_str=int64_to_str,
+                    decimal_to_str=decimal_to_str,
+                    list_to_str=list_to_str
+                )
+            )
+        data_list.append(tuple(each_data_list))
+    return set(data_list)

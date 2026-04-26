@@ -18,6 +18,7 @@ import time
 import copy
 import envx
 from ._data_utils import (
+    build_data_tuple_set,
     build_insert_data_list,
     collect_data_dict_keys,
     filter_data_dict_list_by_columns,
@@ -1565,14 +1566,8 @@ def clean_data(
     """
     data_dict_list_temp = copy.deepcopy(data_dict_list)  # 深度拷贝，不更改源数据
 
-    # step1: 基于已过滤后的数据收集本次写入涉及的列
-    operate_param_set = set()
-    for each_data_dict in data_dict_list_temp:  # 遍历数据list里的所有dict
-        for each_key in each_data_dict:  # 遍历单个dict的所有key
-            operate_param_set.add(each_key)
-
     # step2: 生成操作语句模板
-    operate_param_list = list(operate_param_set)  # 生成插入参数list
+    operate_param_list = collect_data_dict_keys(data_dict_list_temp)  # 生成插入参数list
     operate_clause_tuple = "`,`".join(operate_param_list)
     insert_data_arg_list = list()
     for _ in operate_param_list:
@@ -1591,31 +1586,14 @@ def clean_data(
 
     # step3:
     # 生成插入数据tuple
-    data_list = list()
-    for each_data_dict in data_dict_list_temp:
-        each_data_list = list()
-        for each_data_key in operate_param_list:
-            temp_data = each_data_dict.get(each_data_key)
-            if temp_data == "":
-                if replace_space_to_none is True:
-                    each_data_list.append(None)
-                else:
-                    each_data_list.append("")
-            else:
-                if isinstance(temp_data, np.int64):
-                    each_data_list.append(str(temp_data))  # 将 Int64 转换为str
-                # elif np.isnan(temp_data):
-                #     each_data_list.append(None)  # 将 nan 转换为 None
-                elif isinstance(temp_data, decimal.Decimal):
-                    each_data_list.append(str(temp_data))  # 将 decimal 转换为str
-                elif isinstance(temp_data, datetime.datetime) or isinstance(temp_data, datetime.date):
-                    each_data_list.append(str(temp_data))  # 将 datetime/date 转换为str
-                elif isinstance(temp_data, list):
-                    each_data_list.append(str(temp_data))  # 将 list 转换为str
-                else:
-                    each_data_list.append(temp_data)
-        data_list.append(tuple(each_data_list))  # 转换为tuple确保不变
-    data_list_single = list(set(data_list))  # set去重
+    data_list_single = list(build_data_tuple_set(
+        data_dict_list=data_dict_list_temp,
+        param_list=operate_param_list,
+        replace_space_to_none=replace_space_to_none,
+        int64_to_str=True,
+        decimal_to_str=True,
+        list_to_str=True
+    ))
     return operate_clause, data_list_single
 
 
@@ -1781,10 +1759,9 @@ def insert(
             silence=silence
         )
         if column_info:  # 若未获取到列名信息，提示错误并退出
-            all_col_list, pk_col_list, data_col_list = column_info  # 获取到列名信息
-            data_dict_list_filtered = filter_data_dict_list_by_columns(
+            data_dict_list_filtered, _ = prepare_data_with_column_info(
                 data_dict_list=data_dict_list,
-                all_col_list=all_col_list
+                column_info=column_info
             )
             if not data_dict_list_filtered:
                 close_conn(conn=con, cursor=cur)

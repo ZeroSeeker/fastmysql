@@ -80,6 +80,24 @@ class FilterDataDictListByColumnsTests(unittest.TestCase):
             }
         )
 
+    def test_build_data_tuple_set_supports_clean_data_conversions(self):
+        data_tuple_set = data_utils_module.build_data_tuple_set(
+            data_dict_list=[
+                {"id64": data_utils_module.np.int64(3), "amount": data_utils_module.decimal.Decimal("1.23"), "tags": ["a"], "day": datetime.date(2024, 1, 4), "blank": ""},
+                {"id64": data_utils_module.np.int64(3), "amount": data_utils_module.decimal.Decimal("1.23"), "tags": ["a"], "day": datetime.date(2024, 1, 4), "blank": ""},
+            ],
+            param_list=["id64", "amount", "tags", "day", "blank"],
+            replace_space_to_none=True,
+            int64_to_str=True,
+            decimal_to_str=True,
+            list_to_str=True
+        )
+
+        self.assertEqual(
+            data_tuple_set,
+            {("3", "1.23", "['a']", "2024-01-04", None)}
+        )
+
     def test_fastmysql_filter_keeps_valid_columns_without_mutating_input(self):
         raw = [
             {"id": 1, "name": "alice", "extra": "x"},
